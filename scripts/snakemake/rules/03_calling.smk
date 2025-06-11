@@ -20,8 +20,12 @@ rule cnvkit_batch_tumor:
         mem_mb=config["cnvkit_batch_mem_mb"]
     shell:
         """
-        # Use cnvkit batch with default segmentation
-        cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} -d {params.output_dir} &> {log}
+        # Use cnvkit batch with optional gene annotations
+        ANNOTATE_FLAG=""
+        if [ -n "{config[annotate_refFlat]}" ] && [ -f "{config[annotate_refFlat]}" ]; then
+            ANNOTATE_FLAG="--annotate {config[annotate_refFlat]}"
+        fi
+        cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} -d {params.output_dir} $ANNOTATE_FLAG &> {log}
         """
 
 rule cnvkit_call:

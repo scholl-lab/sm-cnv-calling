@@ -15,6 +15,10 @@ for ref_key in ["reference_genome", "targets_bed", "access_bed"]:
     if not os.path.exists(config[ref_key]):
         sys.exit(f"Critical Error: Reference file not found at path specified by '{ref_key}': {config[ref_key]}")
 
+# Validate optional annotation file if specified
+if config.get("annotate_refFlat") and not os.path.exists(config["annotate_refFlat"]):
+    sys.exit(f"Critical Error: Optional annotation file not found at path specified by 'annotate_refFlat': {config['annotate_refFlat']}")
+
 # --- Sample Sheet Loading and Helpers ---
 try:
     SAMPLES = pd.read_csv(config["samplesheet"], sep="\t", dtype=str)

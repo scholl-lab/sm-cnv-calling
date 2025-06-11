@@ -115,6 +115,7 @@ reference_genome: "/path/to/your/ucsc.hg19.fasta"
 targets_bed: "/path/to/your/targets.bed"
 access_bed: "references/access-5k-mappable.hg19.bed"
 blacklist: "/path/to/your/genomic_blacklist.bed"
+annotate_refFlat: "references/refFlat.txt"  # Optional: comment out to disable gene annotation
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
 
 # Optional: Skip PureCN analysis entirely (default: false)
@@ -183,6 +184,7 @@ Update these paths to match your system:
 | `targets_bed` | Target regions for exome capture | `.bed` |
 | `access_bed` | Mappable regions (e.g., UCSC access-5k) | `.bed` |
 | `blacklist` | Contaminated regions to exclude | `.bed` |
+| `annotate_refFlat` | Gene annotations for CNVkit (optional) | `.txt` |
 | `purecn_normal_panel_vcf` | PureCN normal panel VCF | `.vcf.gz` |
 
 #### Conda Environment Configuration
