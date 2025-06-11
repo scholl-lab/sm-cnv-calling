@@ -5,14 +5,14 @@
 rule create_purecn_mapping_bias:
     output:
         f"{config['dirs']['purecn_setup']}/mapping_bias_{config['purecn_assay_name']}_{config['purecn_genome']}.rds"
-    params: 
-        assay=config["purecn_assay_name"], 
-        genome=config["purecn_genome"], 
+    params:
+        assay=config["purecn_assay_name"],
+        genome=config["purecn_genome"],
         normal_panel_vcf=config["purecn_normal_panel_vcf"]
     log:
         f"{config['dirs']['logs']}/create_purecn_mapping_bias/log.txt"
     conda:
-        f"{config['conda_env_dir']}/purecn.yaml"
+        config["conda_envs"]["purecn"]
     shell:
         "Rscript $(Rscript -e \"cat(system.file('extdata', 'NormalDB.R', package='PureCN'))\") --out-dir {config[dirs][purecn_setup]} --normal-panel {params.normal_panel_vcf} --assay {params.assay} --genome {params.genome} --force &> {log}"
 
@@ -30,7 +30,7 @@ rule run_purecn:
     log:
         f"{config['dirs']['logs']}/run_purecn/{{sample_id}}.log"
     conda:
-        f"{config['conda_env_dir']}/purecn.yaml"
+        config["conda_envs"]["purecn"]
     threads: config["default_threads"]
     shell:
         """
@@ -42,7 +42,7 @@ rule run_purecn:
 
         # Run PureCN
         Rscript $(Rscript -e \"cat(system.file('extdata', 'PureCN.R', package='PureCN'))\") --out {output.temp_dir}/{wildcards.sample_id} --sampleid {wildcards.sample_id} --tumor {output.temp_dir}/temp.cnr --vcf {input.vcf} --mapping-bias-file {input.mapping_bias_db} --genome {params.genome} --post-optimize --force --seed 123 &>> {log}
-        
+
         # Move final outputs
         mv {output.temp_dir}/{wildcards.sample_id}.csv {output.csv}
         mv {output.temp_dir}/{wildcards.sample_id}.rds {output.rds}

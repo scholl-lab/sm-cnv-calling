@@ -13,7 +13,7 @@ rule cnvkit_coverage_normals:
     log:
         f"{config['dirs']['logs']}/cnvkit_coverage_normals/{{normal_id}}.log"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     threads: config["default_threads"]
     shell:
         """
@@ -29,7 +29,7 @@ rule cnvkit_metrics_normals:
     log:
         f"{config['dirs']['logs']}/cnvkit_metrics_normals/log.txt"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         "cnvkit.py metrics {input} > {output.metrics_file} 2> {log}"
 
@@ -54,7 +54,7 @@ rule cnvkit_reference_pooled:
     log:
         f"{config['dirs']['logs']}/cnvkit_reference_pooled/log.txt"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         """
         if [ -s {input.normal_list} ]; then

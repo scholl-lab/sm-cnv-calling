@@ -14,12 +14,12 @@ rule cnvkit_batch_tumor:
     params:
         output_dir=config['dirs']['cnvkit_runs']
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     threads: config["default_threads"]
     resources:
         mem_mb=config["cnvkit_batch_mem_mb"]
     shell:
-        "cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} --exclude {config[plasmid_blacklist]} --segment-threshold {config[segment_threshold]} -d {params.output_dir} &> {log}"
+        "cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} --exclude {config[blacklist]} --segment-threshold {config[segment_threshold]} -d {params.output_dir} &> {log}"
 
 rule cnvkit_call:
     input:
@@ -31,7 +31,7 @@ rule cnvkit_call:
     log:
         f"{config['dirs']['logs']}/cnvkit_call/{{sample_id}}.log"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         """
         VCF_PARAM=""
@@ -52,7 +52,7 @@ rule cnvkit_export_vcf:
     log:
         f"{config['dirs']['logs']}/cnvkit_export_vcf/{{sample_id}}.log"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         """
         cnvkit.py export vcf {input.call_cns} -i {params.sample_id} | bgzip -c > {output.vcf}

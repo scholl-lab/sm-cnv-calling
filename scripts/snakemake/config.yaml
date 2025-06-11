@@ -6,7 +6,6 @@
 # I/O Parameters & Directories
 # ------------------
 samplesheet: "scripts/snakemake/samples.tsv"
-conda_env_dir: "scripts/snakemake/envs"
 
 dirs:
   purecn_setup: "results/01_purecn_setup"
@@ -25,8 +24,15 @@ dirs:
 reference_genome: "/path/to/your/ucsc.hg19.fasta"
 targets_bed: "/path/to/your/targets.bed"
 access_bed: "/path/to/your/access-5k-mappable.hg19.bed"
-plasmid_blacklist: "/path/to/your/plasmid_contamination.bed"
+blacklist: "/path/to/your/genomic_blacklist.bed" # Generic blacklist for contaminants or problematic regions
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
+
+# ------------------
+# Conda Environment Files
+# ------------------
+conda_envs:
+  cnvkit: "scripts/snakemake/envs/cnvkit.yaml"
+  purecn: "scripts/snakemake/envs/purecn.yaml"
 
 # ------------------
 # Tool Parameters

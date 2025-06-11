@@ -12,7 +12,7 @@ rule cnvkit_scatter_genome:
     log:
         f"{config['dirs']['logs']}/cnvkit_scatter_genome/{{sample_id}}.log"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     resources:
         mem_mb=8000
     shell:
@@ -32,7 +32,7 @@ rule cnvkit_scatter_gene:
     log:
         f"{config['dirs']['logs']}/cnvkit_scatter_gene/{{sample_id}}.{{gene}}.log"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         """
         VCF_PARAM=""
@@ -49,7 +49,7 @@ rule cnvkit_diagram:
     log:
         f"{config['dirs']['logs']}/cnvkit_diagram/{{sample_id}}.log"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         "cnvkit.py diagram {input.cnr} -s {input.cns} -o {output.pdf} &> {log}"
 
@@ -61,6 +61,6 @@ rule cnvkit_heatmap_cohort:
     log:
         f"{config['dirs']['logs']}/cnvkit_heatmap_cohort/log.txt"
     conda:
-        f"{config['conda_env_dir']}/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         "cnvkit.py heatmap {input} -d -o {output.pdf} &> {log}"

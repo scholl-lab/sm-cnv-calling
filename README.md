@@ -69,7 +69,7 @@ Edit `scripts/snakemake/config.yaml` to specify your reference files:
 reference_genome: "/path/to/your/ucsc.hg19.fasta"
 targets_bed: "/path/to/your/targets.bed"
 access_bed: "/path/to/your/access-5k-mappable.hg19.bed"
-plasmid_blacklist: "/path/to/your/plasmid_contamination.bed"
+blacklist: "/path/to/your/genomic_blacklist.bed"
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
 ```
 
@@ -108,7 +108,7 @@ Update these paths to match your system:
 | `reference_genome` | Reference FASTA file | `.fasta`, `.fa` |
 | `targets_bed` | Target regions for exome capture | `.bed` |
 | `access_bed` | Mappable regions (e.g., UCSC access-5k) | `.bed` |
-| `plasmid_blacklist` | Contaminated regions to exclude | `.bed` |
+| `blacklist` | Contaminated regions to exclude | `.bed` |
 | `purecn_normal_panel_vcf` | PureCN normal panel VCF | `.vcf.gz` |
 
 #### Tool Parameters
