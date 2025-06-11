@@ -39,7 +39,8 @@ if not config.get("skip_purecn", False):
 
     rule cnvkit_for_purecn:
         input:
-            tumor_bam=lambda w: SAMPLES.loc[w.sample_id, "tumor_bam"]
+            tumor_bam=lambda w: SAMPLES.loc[w.sample_id, "tumor_bam"],
+            antitargets=f"{config['dirs']['pon_creation']}/antitargets.bed"
         output:
             cnr=f"{config['dirs']['purecn_runs']}/{{sample_id}}_for_purecn.cnr",
             temp_dir=directory(temp(f"{config['dirs']['purecn_runs']}/cnvkit_temp_{{sample_id}}"))
@@ -52,8 +53,8 @@ if not config.get("skip_purecn", False):
             """
             # Generate temporary coverage files and CNR file for PureCN
             cnvkit.py coverage {input.tumor_bam} {config[targets_bed]} -p {threads} -o {output.temp_dir}/temp.target.cnn &> {log}
-            cnvkit.py coverage {input.tumor_bam} {config[access_bed]} -p {threads} -o {output.temp_dir}/temp.antitarget.cnn &>> {log}
-            cnvkit.py reference -f {config[reference_genome]} -t {config[targets_bed]} -a {config[access_bed]} -o {output.temp_dir}/temp.ref.cnn &>> {log}
+            cnvkit.py coverage {input.tumor_bam} {input.antitargets} -p {threads} -o {output.temp_dir}/temp.antitarget.cnn &>> {log}
+            cnvkit.py reference -f {config[reference_genome]} -t {config[targets_bed]} -a {input.antitargets} -o {output.temp_dir}/temp.ref.cnn &>> {log}
             cnvkit.py fix {output.temp_dir}/temp.target.cnn {output.temp_dir}/temp.antitarget.cnn {output.temp_dir}/temp.ref.cnn -o {output.cnr} &>> {log}
             """
 

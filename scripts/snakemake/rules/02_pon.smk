@@ -4,9 +4,25 @@
 
 ruleorder: cnvkit_reference_pooled > cnvkit_batch_tumor
 
+# Global rule to create antitarget regions (needed by both PoN and PureCN workflows)
+rule create_antitarget_bed:
+    input:
+        targets=config["targets_bed"],
+        access=config["access_bed"]
+    output:
+        antitargets=f"{config['dirs']['pon_creation']}/antitargets.bed"
+    log:
+        f"{config['dirs']['logs']}/create_antitarget_bed/log.txt"
+    conda:
+        config["conda_envs"]["cnvkit"]
+    shell:
+        "cnvkit.py antitarget {input.targets} -g {input.access} -o {output.antitargets} &> {log}"
+
 rule cnvkit_coverage_normals:
     input:
-        bam=lambda w: get_normal_bams_for_pon()[w.normal_id]
+        bam=lambda w: get_normal_bams_for_pon()[w.normal_id],
+        targets=config["targets_bed"],
+        antitargets=rules.create_antitarget_bed.output.antitargets
     output:
         target=f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.targetcoverage.cnn",
         antitarget=f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.antitargetcoverage.cnn"
@@ -17,8 +33,8 @@ rule cnvkit_coverage_normals:
     threads: config["default_threads"]
     shell:
         """
-        cnvkit.py coverage {input.bam} {config[targets_bed]} -p {threads} -o {output.target} &> {log}
-        cnvkit.py coverage {input.bam} {config[access_bed]} -p {threads} -o {output.antitarget} &>> {log}
+        cnvkit.py coverage {input.bam} {input.targets} -p {threads} -o {output.target} &> {log}
+        cnvkit.py coverage {input.bam} {input.antitargets} -p {threads} -o {output.antitarget} &>> {log}
         """
 
 rule cnvkit_metrics_normals:
