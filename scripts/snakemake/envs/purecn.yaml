@@ -3,7 +3,6 @@ channels:
   - bioconda
   - defaults
 dependencies:
-  - r-base=4.4.3=h85845a0_2
-  - bioconductor-purecn=2.12.0=r44hdfd78af_0
-  - r-optparse=1.7.5=r44hc72bb7e_1
-  - r-r.utils=2.13.0=r44hc72bb7e_0
+  - r-base
+  - r-r.utils
+  - zlib
