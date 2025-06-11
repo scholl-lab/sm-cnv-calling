@@ -73,4 +73,4 @@ rule consolidate_purity:
     log:
         f"{config['dirs']['logs']}/consolidate_purity/{{sample_id}}.log"
     shell:
-        "python scripts/snakemake/helpers/consolidate_purity.py --purecn-csv {params.purecn_csv_param} --fallback-purity {params.fallback_purity} --output {output} &> {log}"
+        "python {config[helpers_dir]}/consolidate_purity.py --purecn-csv {params.purecn_csv_param} --fallback-purity {params.fallback_purity} --output {output} &> {log}"

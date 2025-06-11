@@ -43,7 +43,7 @@ rule identify_clean_normals:
     log:
         f"{config['dirs']['logs']}/identify_clean_normals/log.txt"
     shell:
-        "python scripts/snakemake/helpers/identify_clean_normals.py -i {input.metrics} -o {output.clean_list} -t {params.threshold} &> {log}"
+        "python {config[helpers_dir]}/identify_clean_normals.py -i {input.metrics} -o {output.clean_list} -t {params.threshold} &> {log}"
 
 rule cnvkit_reference_pooled:
     input:

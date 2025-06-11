@@ -39,6 +39,11 @@ conda_envs:
   purecn: purecn
 
 # ------------------
+# Helper Scripts Directory
+# ------------------
+helpers_dir: "scripts/helpers"
+
+# ------------------
 # Tool Parameters
 # ------------------
 purecn_genome: "hg19"
