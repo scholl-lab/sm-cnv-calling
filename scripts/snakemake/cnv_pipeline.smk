@@ -47,7 +47,15 @@ def get_vcf_for_call(wildcards):
 # ----------------------------------------------------------------------------------- #
 rule all:
     input:
-        expand("results/07_final_vcfs/{sample_id}.cnv.vcf.gz", sample_id=get_tumor_samples())
+        # Final VCF calls
+        expand("results/07_final_vcfs/{sample_id}.cnv.vcf.gz", sample_id=get_tumor_samples()),
+        # Per-sample plots
+        expand(f"{config['plot_dir']}/scatter_genome/{{sample_id}}.genome.pdf", sample_id=get_tumor_samples()),
+        expand(f"{config['plot_dir']}/diagram/{{sample_id}}.diagram.pdf", sample_id=get_tumor_samples()),
+        # Gene-specific scatter plots
+        expand(f"{config['plot_dir']}/scatter_gene/{{sample_id}}.{{gene}}.pdf", sample_id=get_tumor_samples(), gene=config["genes_of_interest"]),
+        # Cohort-level heatmap
+        f"{config['plot_dir']}/heatmap_cohort.pdf"
 
 # ----------------------------------------------------------------------------------- #
 # MODULE 1: PURITY ESTIMATION
@@ -295,3 +303,72 @@ rule cnvkit_export_vcf:
         cnvkit.py export vcf {input.call_cns} -i {params.sample_id} | bgzip -c > {output.vcf}
         tabix -p vcf {output.vcf}
         """
+
+# ----------------------------------------------------------------------------------- #
+# MODULE 5: PLOTTING AND VISUALIZATION
+# ----------------------------------------------------------------------------------- #
+rule cnvkit_scatter_genome:
+    input:
+        cnr=rules.cnvkit_batch_tumor.output.cnr,
+        cns=rules.cnvkit_batch_tumor.output.cns,
+        vcf=get_vcf_for_call,
+    output:
+        pdf=f"{config['plot_dir']}/scatter_genome/{{sample_id}}.genome.pdf"
+    log:
+        f"logs/plotting/scatter_genome.{{sample_id}}.log"
+    conda:
+        f"{config['conda_env_dir']}/cnvkit.yaml"
+    shell:
+        """
+        VCF_PARAM=""
+        if [ -n "{input.vcf}" ]; then
+            VCF_PARAM="-v {input.vcf}"
+        fi
+        cnvkit.py scatter {input.cnr} -s {input.cns} $VCF_PARAM -o {output.pdf} &> {log}
+        """
+
+rule cnvkit_scatter_gene:
+    input:
+        cnr=lambda w: f"results/05_cnvkit_runs/{w.sample_id}.cnr",
+        cns=lambda w: f"results/05_cnvkit_runs/{w.sample_id}.cns",
+        vcf=get_vcf_for_call,
+    output:
+        pdf=f"{config['plot_dir']}/scatter_gene/{{sample_id}}.{{gene}}.pdf"
+    log:
+        f"logs/plotting/scatter_gene.{{sample_id}}.{{gene}}.log"
+    conda:
+        f"{config['conda_env_dir']}/cnvkit.yaml"
+    shell:
+        """
+        VCF_PARAM=""
+        if [ -n "{input.vcf}" ]; then
+            VCF_PARAM="-v {input.vcf}"
+        fi
+        cnvkit.py scatter {input.cnr} -s {input.cns} $VCF_PARAM -g {wildcards.gene} -o {output.pdf} &> {log}
+        """
+
+rule cnvkit_diagram:
+    input:
+        cnr=rules.cnvkit_batch_tumor.output.cnr,
+        cns=rules.cnvkit_batch_tumor.output.cns,
+    output:
+        pdf=f"{config['plot_dir']}/diagram/{{sample_id}}.diagram.pdf"
+    log:
+        f"logs/plotting/diagram.{{sample_id}}.log"
+    conda:
+        f"{config['conda_env_dir']}/cnvkit.yaml"
+    shell:
+        "cnvkit.py diagram {input.cnr} -s {input.cns} -o {output.pdf} &> {log}"
+
+rule cnvkit_heatmap_cohort:
+    input:
+        expand(rules.cnvkit_batch_tumor.output.cns, sample_id=get_tumor_samples())
+    output:
+        pdf=f"{config['plot_dir']}/heatmap_cohort.pdf"
+    log:
+        f"logs/plotting/heatmap_cohort.log"
+    conda:
+        f"{config['conda_env_dir']}/cnvkit.yaml"
+    shell:
+        # The -d flag desaturates colors for low-amplitude CNVs, making significant ones stand out
+        "cnvkit.py heatmap {input} -d -o {output.pdf} &> {log}"

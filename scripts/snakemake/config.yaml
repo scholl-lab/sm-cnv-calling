@@ -50,3 +50,15 @@ segment_threshold: 1.0e-4
 # ------------------
 default_threads: 4
 default_mem_mb: 16000
+
+# ------------------
+# Plotting Parameters
+# ------------------
+# Directory to store all generated plots
+plot_dir: "results/08_plots"
+# A list of key genes for which to generate individual scatter plots
+genes_of_interest:
+  - "TP53"
+  - "MYC"
+  - "EGFR"
+  - "ERBB2"
