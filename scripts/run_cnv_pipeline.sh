@@ -11,8 +11,10 @@ set -euo pipefail
 
 ################################################################################
 # Usage:
-#   sbatch run_cnv_pipeline.sh [MAX_JOBS]
+#   sbatch run_cnv_pipeline.sh [SNAKEFILE] [CONFIG_FILE] [MAX_JOBS]
 #
+#   - SNAKEFILE: Path to the Snakemake file (default: scripts/snakemake/cnv_pipeline.smk)
+#   - CONFIG_FILE: Path to the config file (default: scripts/snakemake/config.yaml)
 #   - MAX_JOBS: Number of Snakemake jobs to run in parallel (default: 50)
 #
 # Description:
@@ -21,9 +23,26 @@ set -euo pipefail
 # for submitting individual jobs.
 ################################################################################
 
-MAX_JOBS=${1:-50}
-SNAKEMAKE_FILE="scripts/snakemake/cnv_pipeline.smk"
-CONFIG_FILE="scripts/snakemake/config.yaml"
+SNAKEMAKE_FILE=${1:-"scripts/snakemake/cnv_pipeline.smk"}
+CONFIG_FILE=${2:-"scripts/snakemake/config.yaml"}
+MAX_JOBS=${3:-50}
+
+# Validate that MAX_JOBS is a number
+if ! [[ "$MAX_JOBS" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: MAX_JOBS must be a positive integer, got: $MAX_JOBS"
+    exit 1
+fi
+
+# Validate that input files exist
+if [[ ! -f "$SNAKEMAKE_FILE" ]]; then
+    echo "ERROR: Snakefile not found: $SNAKEMAKE_FILE"
+    exit 1
+fi
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "ERROR: Config file not found: $CONFIG_FILE"
+    exit 1
+fi
 
 export TMPDIR="$HOME/scratch/tmp"
 if [ ! -d "$TMPDIR" ]; then mkdir -p "$TMPDIR"; fi
