@@ -59,9 +59,35 @@ cd sm-cnv-calling
 
 **Prerequisites**: [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda installed
 
+#### A. Create Conda Environments
+
+The pipeline uses two main conda environments that need to be created before running. You can either let Snakemake create them automatically or set them up manually:
+
+**Option 1: Automatic Setup (Recommended)**
+```bash
+# Snakemake will automatically create the environments when first run
+snakemake -s scripts/snakemake/cnv_pipeline.smk --use-conda --conda-prefix conda_envs --cores 1 --dry-run
+```
+
+**Option 2: Manual Setup**
+```bash
+# Create the conda environments manually with specific names
+conda env create -f scripts/snakemake/envs/cnvkit.yaml -n cnvkit
+conda env create -f scripts/snakemake/envs/purecn.yaml -n purecn
+
+# Alternatively, create them in the conda_envs directory as Snakemake expects
+mkdir -p conda_envs
+conda env create -f scripts/snakemake/envs/cnvkit.yaml -p conda_envs/cnvkit
+conda env create -f scripts/snakemake/envs/purecn.yaml -p conda_envs/purecn
+```
+
+The pipeline will automatically use these environments for different steps:
+- **`cnvkit`**: Used for CNVkit operations, coverage analysis, and plotting
+- **`purecn`**: Used for PureCN-based purity estimation
+
 ### 2. Configuration
 
-#### A. Download Standard Reference Files (Optional)
+#### B. Download Standard Reference Files (Optional)
 
 This repository includes a helper script to download standard accessory files (`access*.bed`, `refFlat.txt`) for common genome builds.
 
@@ -69,16 +95,18 @@ This repository includes a helper script to download standard accessory files (`
 # Create a directory for your references
 mkdir -p references
 
-# Activate a conda environment with the necessary tools (e.g., the one for cnvkit)
-# Or run this after the first snakemake run creates the envs.
-# conda activate conda_envs/cnvkit_env
+# Activate the cnvkit conda environment (if created manually)
+# conda activate cnvkit
+# Or if using conda_envs directory:
+# conda activate conda_envs/cnvkit
 
 # Download files for hg19
 python scripts/snakemake/helpers/download_references.py --genome hg19 --output-dir references/
 ```
+
 This will download `access-5k-mappable.hg19.bed` and `refFlat.txt` into the `references/` directory.
 
-#### B. Configure the Pipeline
+#### C. Configure the Pipeline
 
 Edit `scripts/snakemake/config.yaml` to specify your reference files. If you used the downloader script, these paths would be `references/access-5k-mappable.hg19.bed`, `references/refFlat.txt`, etc.:
 
@@ -91,17 +119,17 @@ purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
 annotate_refFlat: "references/refFlat.txt"
 ```
 
-#### C. Prepare Sample Sheet
+#### D. Prepare Sample Sheet
 
 Create your `scripts/snakemake/samples.tsv` with sample information (see [Input Formats](#input-formats) below).
 
 ### 3. Execution
 
-Before running the pipeline, you need to set up the conda environments. Then execute the pipeline:
+The conda environments will be automatically created by Snakemake when using the `--use-conda` flag. Execute the pipeline:
 
 ```bash
-# Run the complete pipeline
-snakemake -s scripts/snakemake/cnv_pipeline.smk --use-conda --cores 8
+# Run the complete pipeline (environments created automatically)
+snakemake -s scripts/snakemake/cnv_pipeline.smk --use-conda --conda-prefix conda_envs --cores 8
 
 # For cluster execution (SLURM)
 sbatch scripts/run_cnv_pipeline.sh
@@ -149,6 +177,20 @@ Update these paths to match your system:
 | `access_bed` | Mappable regions (e.g., UCSC access-5k) | `.bed` |
 | `blacklist` | Contaminated regions to exclude | `.bed` |
 | `purecn_normal_panel_vcf` | PureCN normal panel VCF | `.vcf.gz` |
+
+#### Conda Environment Configuration
+
+The pipeline uses two conda environments defined in the `conda_envs` section:
+
+```yaml
+conda_envs:
+  cnvkit: "scripts/snakemake/envs/cnvkit.yaml"    # CNVkit operations and plotting
+  purecn: "scripts/snakemake/envs/purecn.yaml"    # PureCN purity estimation
+```
+
+When using `--conda-prefix conda_envs`, Snakemake will create environments in:
+- `conda_envs/cnvkit/` - Contains cnvkit, pandas, requests, tqdm, and related tools
+- `conda_envs/purecn/` - Contains R, PureCN, and related Bioconductor packages
 
 #### Tool Parameters
 
