@@ -61,26 +61,65 @@ cd sm-cnv-calling
 
 ### 2. Configuration
 
-#### A. Update Reference Files
+#### A. Download Standard Reference Files (Optional)
 
-Edit `scripts/snakemake/config.yaml` to specify your reference files:
+This repository includes a helper script to download standard accessory files (`access*.bed`, `refFlat.txt`) for common genome builds.
+
+```bash
+# Create a directory for your references
+mkdir -p references
+
+# Activate a conda environment with the necessary tools (e.g., the one for cnvkit)
+# Or run this after the first snakemake run creates the envs.
+# conda activate conda_envs/cnvkit_env
+
+# Download files for hg19
+python scripts/snakemake/helpers/download_references.py --genome hg19 --output-dir references/
+```
+This will download `access-5k-mappable.hg19.bed` and `refFlat.txt` into the `references/` directory.
+
+#### B. Configure the Pipeline
+
+Edit `scripts/snakemake/config.yaml` to specify your reference files. If you used the downloader script, these paths would be `references/access-5k-mappable.hg19.bed`, `references/refFlat.txt`, etc.:
 
 ```yaml
 reference_genome: "/path/to/your/ucsc.hg19.fasta"
 targets_bed: "/path/to/your/targets.bed"
-access_bed: "/path/to/your/access-5k-mappable.hg19.bed"
+access_bed: "references/access-5k-mappable.hg19.bed"
 blacklist: "/path/to/your/genomic_blacklist.bed"
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
+annotate_refFlat: "references/refFlat.txt"
 ```
 
-#### B. Prepare Sample Sheet
+#### C. Prepare Sample Sheet
 
 Create your `scripts/snakemake/samples.tsv` with sample information (see [Input Formats](#input-formats) below).
 
 ### 3. Execution
 
+Before running the pipeline, you need to set up the conda environments. Then execute the pipeline:
+
 ```bash
-# ## Configuration Reference
+# Run the complete pipeline
+snakemake -s scripts/snakemake/cnv_pipeline.smk --use-conda --cores 8
+
+# For cluster execution (SLURM)
+sbatch scripts/run_cnv_pipeline.sh
+```
+
+### 4. Using the Reference Downloader
+
+For additional reference files (like hg38 or updated files), you can use the included downloader:
+
+```bash
+# Download hg38 files
+python scripts/snakemake/helpers/download_references.py --genome hg38 --output-dir references/
+
+# Download with custom config path
+python scripts/snakemake/helpers/download_references.py --genome hg19 --output-dir references/ --config my_custom_download_config.yaml
+```
+
+## Configuration Reference
 
 ### Core Configuration (`config.yaml`)
 

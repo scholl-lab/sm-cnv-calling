@@ -1,0 +1,14 @@
+# ----------------------------------------------------------------------------------- #
+# Default URLs for CNVkit Reference Accessory Files
+# Sources are based on the official CNVkit repository and UCSC.
+# ----------------------------------------------------------------------------------- #
+
+hg19:
+  access_bed: "https://raw.githubusercontent.com/etal/cnvkit/master/data/access-5k-mappable.hg19.bed"
+  ref_flat: "http://hgdownload.cse.ucsc.edu/goldenpath/hg19/database/refFlat.txt.gz"
+
+hg38:
+  access_bed: "https://raw.githubusercontent.com/etal/cnvkit/master/data/access-10kb.hg38.bed"
+  ref_flat: "http://hgdownload.cse.ucsc.edu/goldenpath/hg38/database/refFlat.txt.gz"
+
+# Add other genome builds here as needed, e.g., mm10
