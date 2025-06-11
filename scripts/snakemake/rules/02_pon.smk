@@ -53,7 +53,7 @@ rule cnvkit_reference_pooled:
         pooled_ref=f"{config['dirs']['pon_creation']}/pooled_reference.cnn"
     params:
         # Conditionally add annotate flag if refFlat is provided in config
-        annotate_flag=lambda w, config: f"--annotate {config['annotate_refFlat']}" if "annotate_refFlat" in config and config["annotate_refFlat"] else ""
+        annotate_flag=lambda wildcards: f"--annotate {config['annotate_refFlat']}" if "annotate_refFlat" in config and config["annotate_refFlat"] else ""
     log:
         f"{config['dirs']['logs']}/cnvkit_reference_pooled/log.txt"
     conda:
