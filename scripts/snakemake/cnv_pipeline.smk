@@ -17,7 +17,12 @@ for ref_key in ["reference_genome", "targets_bed", "access_bed"]:
 
 # --- Sample Sheet Loading and Helpers ---
 try:
-    SAMPLES = pd.read_csv(config["samplesheet"], sep="\t", dtype=str).set_index("sample_id", drop=False)
+    SAMPLES = pd.read_csv(config["samplesheet"], sep="\t", dtype=str)
+    # Check for duplicate sample IDs
+    if SAMPLES["sample_id"].duplicated().any():
+        duplicated_ids = SAMPLES[SAMPLES["sample_id"].duplicated(keep=False)]["sample_id"].tolist()
+        sys.exit(f"Critical Error: Duplicate sample IDs found in sample sheet: {duplicated_ids}")
+    SAMPLES = SAMPLES.set_index("sample_id", drop=False)
 except FileNotFoundError:
     sys.exit(f"Critical Error: Sample sheet not found at {config['samplesheet']}. Please create it.")
 
@@ -57,8 +62,17 @@ def get_purecn_candidates():
     return SAMPLES[(SAMPLES.analysis_type == "TvsN") & (SAMPLES.vcf.notna()) & (SAMPLES.vcf != "")].index.tolist()
 
 def get_vcf_for_call(wildcards):
-    sample_vcf = SAMPLES.loc[wildcards.sample_id, "vcf"]
-    return [sample_vcf] if pd.notna(sample_vcf) and sample_vcf != "" else []
+    try:
+        sample_vcf = SAMPLES.loc[wildcards.sample_id, "vcf"]
+        # Ensure we have a scalar value, not a Series
+        if isinstance(sample_vcf, pd.Series):
+            if sample_vcf.empty:
+                return []
+            sample_vcf = sample_vcf.iloc[0]
+        return [sample_vcf] if pd.notna(sample_vcf) and sample_vcf != "" else []
+    except KeyError:
+        # Sample ID not found in the dataframe
+        return []
 
 # --- Main Workflow Target ---
 rule all:
