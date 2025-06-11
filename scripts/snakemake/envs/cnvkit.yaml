@@ -1,16 +1,12 @@
+name: cnvkit
 channels:
   - conda-forge
   - bioconda
-  - defaults
+  - nodefaults
 dependencies:
-  - python=3.9
-  - snakemake-wrapper-utils
-  - cnvkit=0.9.10
-  - pandas
-  - pyyaml
-  - requests
-  - tqdm
-  - htslib
-  - samtools
-  - bgzip
-  - tabix
+  - python=3.10.18=hd6af730_0_cpython
+  - snakemake-wrapper-utils=0.7.2=pyhdfd78af_0
+  - cnvkit=0.9.12=pyhdfd78af_0
+  - htslib=1.22=h566b1c6_0
+  - samtools=1.22=h96c455f_0
+  - tabix=1.11=hdfd78af_0
