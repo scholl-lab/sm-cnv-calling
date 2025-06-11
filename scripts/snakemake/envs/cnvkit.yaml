@@ -1,0 +1,14 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python=3.9
+  - snakemake-wrapper-utils
+  - cnvkit=0.9.10 
+  - pandas
+  - pyyaml
+  - htslib
+  - samtools
+  - bgzip
+  - tabix

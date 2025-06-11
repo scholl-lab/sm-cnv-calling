@@ -1,0 +1,52 @@
+# ----------------------------------------------------------------------------------- #
+#                   Configuration for CNVkit-PureCN Pipeline                          #
+# ----------------------------------------------------------------------------------- #
+
+# ------------------
+# I/O Parameters
+# ------------------
+# Main output directory for all results
+output_folder: "results/"
+# Folder for pipeline logs
+log_folder: "logs/"
+# Path to the sample sheet defining inputs and analysis types
+samplesheet: "scripts/snakemake/samples.tsv"
+# Path to the conda environment definitions
+conda_env_dir: "scripts/snakemake/envs"
+
+# ------------------
+# Reference Files (USER MUST UPDATE THESE PATHS)
+# ------------------
+reference_genome: "/path/to/your/ucsc.hg19.fasta"
+# Target BED should be the *baits* file for hybrid capture
+targets_bed: "/path/to/your/targets.bed"
+# Annotation file for labeling genes (optional but recommended)
+annotate_refFlat: "/path/to/your/refFlat.txt"
+# Pre-calculated sequencing-accessible regions (for antitargets)
+access_bed: "/path/to/your/access-5k-mappable.hg19.bed"
+# Blacklist for regions with known plasmid or other contamination to exclude from analysis
+plasmid_blacklist: "/path/to/your/plasmid_contamination.bed"
+
+# ------------------
+# PureCN Parameters
+# ------------------
+# A VCF containing only germline variants from a panel of normal samples.
+# Used to create a mapping bias database for accurate allele frequency modeling.
+purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
+purecn_genome: "hg19" # Must match reference genome (e.g., hg19 or hg38)
+purecn_assay_name: "MyTumorAssay" # A unique identifier for your sequencing assay
+
+# ------------------
+# CNVkit Parameters
+# ------------------
+# Threshold for identifying noisy normals to exclude from the Panel of Normals (PoN).
+# This is the Tukey's biweight midvariance from 'cnvkit.py metrics'.
+pon_qc_metric_threshold: 0.3
+# Segmentation p-value threshold for circular binary segmentation (CBS).
+segment_threshold: 1.0e-4
+
+# ------------------
+# Resource Allocation
+# ------------------
+default_threads: 4
+default_mem_mb: 16000

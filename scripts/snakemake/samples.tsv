@@ -1,0 +1,6 @@
+sample_id	analysis_type	tumor_bam	normal_bam	vcf	fallback_purity
+PatientA	TvsN	/path/to/bams/PatientA_T.bam	/path/to/bams/PatientA_N.bam	/path/to/vcfs/PatientA.vcf.gz	0.35
+PatientB	To	/path/to/bams/PatientB_T.bam		/path/to/vcfs/PatientB.vcf.gz	0.40
+PatientC_Normal	Normal		/path/to/bams/PatientC_N.bam		
+PatientD_Normal	Normal		/path/to/bams/PatientD_N.bam		
+PatientE_Normal_Noisy	Normal		/path/to/bams/PatientE_N.bam				
