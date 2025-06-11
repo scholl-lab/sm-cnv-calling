@@ -57,7 +57,7 @@ rule cnvkit_reference_pooled:
     log:
         f"{config['dirs']['logs']}/cnvkit_reference_pooled/log.txt"
     conda:
-        "../envs/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     shell:
         """
         # Note: The 'cnvkit.py batch' command uses '--targets' and '--annotate' to create an

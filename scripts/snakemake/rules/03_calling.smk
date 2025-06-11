@@ -14,7 +14,7 @@ rule cnvkit_batch_tumor:
     params:
         output_dir=config['dirs']['cnvkit_runs']
     conda:
-        "../envs/cnvkit.yaml"
+        config["conda_envs"]["cnvkit"]
     threads: config["default_threads"]
     resources:
         mem_mb=config["cnvkit_batch_mem_mb"]
