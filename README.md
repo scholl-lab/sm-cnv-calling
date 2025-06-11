@@ -116,7 +116,6 @@ targets_bed: "/path/to/your/targets.bed"
 access_bed: "references/access-5k-mappable.hg19.bed"
 blacklist: "/path/to/your/genomic_blacklist.bed"
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
-annotate_refFlat: "references/refFlat.txt"
 
 # Optional: Skip PureCN analysis entirely (default: false)
 skip_purecn: false

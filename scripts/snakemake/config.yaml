@@ -27,10 +27,6 @@ access_bed: "/path/to/your/access-5k-mappable.hg19.bed"
 blacklist: "/path/to/your/genomic_blacklist.bed" # Generic blacklist for contaminants or problematic regions
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
 
-# Optional annotation file for labeling genes if not present in the targets_bed.
-# Comment out to disable annotation.
-annotate_refFlat: "/path/to/your/refFlat.txt"
-
 # ------------------
 # Conda Environment Files
 # ------------------

@@ -51,9 +51,6 @@ rule cnvkit_reference_pooled:
         normal_coverages=expand(f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.targetcoverage.cnn", normal_id=get_normal_sample_ids())
     output:
         pooled_ref=f"{config['dirs']['pon_creation']}/pooled_reference.cnn"
-    params:
-        # Conditionally add annotate flag if refFlat is provided in config
-        annotate_flag=lambda wildcards: f"--annotate {config['annotate_refFlat']}" if "annotate_refFlat" in config and config["annotate_refFlat"] else ""
     log:
         f"{config['dirs']['logs']}/cnvkit_reference_pooled/log.txt"
     conda:
@@ -67,7 +64,6 @@ rule cnvkit_reference_pooled:
             GLOB_PATTERN=$(cat {input.normal_list} | sed 's/\\.targetcoverage\\.cnn/\\.\\*targetcoverage\\.cnn/' | tr '\\n' ' ')
             cnvkit.py reference $GLOB_PATTERN \\
                 -f {config[reference_genome]} \\
-                {params.annotate_flag} \\
                 -o {output.pooled_ref} &>> {log}
         else
             # Fallback to a flat reference if no clean normals are available
@@ -76,7 +72,6 @@ rule cnvkit_reference_pooled:
                 -f {config[reference_genome]} \\
                 -t {config[targets_bed]} \\
                 -a {config[access_bed]} \\
-                {params.annotate_flag} \\
                 -o {output.pooled_ref} &>> {log}
         fi
         """
