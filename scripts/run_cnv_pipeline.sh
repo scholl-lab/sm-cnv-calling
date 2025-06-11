@@ -7,6 +7,8 @@
 #SBATCH --mem=4000M
 #SBATCH --output=slurm_logs/%x-%j.log
 
+set -euo pipefail
+
 ################################################################################
 # Usage:
 #   sbatch run_cnv_pipeline.sh [MAX_JOBS]
@@ -19,26 +21,16 @@
 # for submitting individual jobs.
 ################################################################################
 
-# ------------------------------------------------------------------------------
-# 1) Parse command-line arguments with defaults
-# ------------------------------------------------------------------------------
 MAX_JOBS=${1:-50}
-SNAKEMAKE_FILE="snakemake/cnv_pipeline.smk"
-CONFIG_FILE="snakemake/config.yaml"
+SNAKEMAKE_FILE="scripts/snakemake/cnv_pipeline.smk"
+CONFIG_FILE="scripts/snakemake/config.yaml"
 
-# ------------------------------------------------------------------------------
-# 2) HPC environment setup
-# ------------------------------------------------------------------------------
-# Point TMPDIR to a unique scratch directory and set up cleanup on exit
 export TMPDIR="$HOME/scratch/tmp"
 if [ ! -d "$TMPDIR" ]; then mkdir -p "$TMPDIR"; fi
 export TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
 
-# Create the slurm_logs directory if it doesn't exist
 mkdir -p slurm_logs
-
-# Export default SBATCH outputs for Snakemake cluster jobs
 export SBATCH_DEFAULTS="--output=slurm_logs/%x-%j.log"
 
 echo "INFO: Running CNV pipeline with:"
@@ -48,14 +40,10 @@ echo "      Max jobs:     $MAX_JOBS"
 echo "      TMPDIR:       $TMPDIR"
 date
 
-# ------------------------------------------------------------------------------
-# 3) Run Snakemake using a cluster profile
-# ------------------------------------------------------------------------------
-# The 'srun' command starts the main Snakemake process.
-# Snakemake itself will submit individual jobs to the cluster via the profile.
 srun snakemake \
     -s "$SNAKEMAKE_FILE" \
     --use-conda \
+    --conda-prefix "conda_envs" \
     --profile=cubi-v1 \
     -j "$MAX_JOBS" \
     --configfile "$CONFIG_FILE" \

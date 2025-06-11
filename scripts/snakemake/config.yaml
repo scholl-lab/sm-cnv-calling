@@ -3,62 +3,51 @@
 # ----------------------------------------------------------------------------------- #
 
 # ------------------
-# I/O Parameters
+# I/O Parameters & Directories
 # ------------------
-# Main output directory for all results
-output_folder: "results/"
-# Folder for pipeline logs
-log_folder: "logs/"
-# Path to the sample sheet defining inputs and analysis types
 samplesheet: "scripts/snakemake/samples.tsv"
-# Path to the conda environment definitions
 conda_env_dir: "scripts/snakemake/envs"
+
+dirs:
+  purecn_setup: "results/01_purecn_setup"
+  purecn_runs: "results/02_purecn_runs"
+  purity_values: "results/03_purity_values"
+  pon_creation: "results/04_pon_creation"
+  cnvkit_runs: "results/05_cnvkit_runs"
+  final_calls: "results/06_final_calls"
+  final_vcfs: "results/07_final_vcfs"
+  plots: "results/08_plots"
+  logs: "logs"
 
 # ------------------
 # Reference Files (USER MUST UPDATE THESE PATHS)
 # ------------------
 reference_genome: "/path/to/your/ucsc.hg19.fasta"
-# Target BED should be the *baits* file for hybrid capture
 targets_bed: "/path/to/your/targets.bed"
-# Annotation file for labeling genes (optional but recommended)
-annotate_refFlat: "/path/to/your/refFlat.txt"
-# Pre-calculated sequencing-accessible regions (for antitargets)
 access_bed: "/path/to/your/access-5k-mappable.hg19.bed"
-# Blacklist for regions with known plasmid or other contamination to exclude from analysis
 plasmid_blacklist: "/path/to/your/plasmid_contamination.bed"
-
-# ------------------
-# PureCN Parameters
-# ------------------
-# A VCF containing only germline variants from a panel of normal samples.
-# Used to create a mapping bias database for accurate allele frequency modeling.
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
-purecn_genome: "hg19" # Must match reference genome (e.g., hg19 or hg38)
-purecn_assay_name: "MyTumorAssay" # A unique identifier for your sequencing assay
 
 # ------------------
-# CNVkit Parameters
+# Tool Parameters
 # ------------------
-# Threshold for identifying noisy normals to exclude from the Panel of Normals (PoN).
-# This is the Tukey's biweight midvariance from 'cnvkit.py metrics'.
+purecn_genome: "hg19"
+purecn_assay_name: "MyTumorAssay"
 pon_qc_metric_threshold: 0.3
-# Segmentation p-value threshold for circular binary segmentation (CBS).
 segment_threshold: 1.0e-4
+
+# ------------------
+# Plotting Parameters
+# ------------------
+genes_of_interest:
+  - "TP53"
+  - "MYC"
+  - "EGFR"
+  - "ERBB2"
 
 # ------------------
 # Resource Allocation
 # ------------------
 default_threads: 4
 default_mem_mb: 16000
-
-# ------------------
-# Plotting Parameters
-# ------------------
-# Directory to store all generated plots
-plot_dir: "results/08_plots"
-# A list of key genes for which to generate individual scatter plots
-genes_of_interest:
-  - "TP53"
-  - "MYC"
-  - "EGFR"
-  - "ERBB2"
+cnvkit_batch_mem_mb: 24000

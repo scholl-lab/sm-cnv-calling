@@ -1,0 +1,62 @@
+# ----------------------------------------------------------------------------------- #
+# MODULE 1: PURITY ESTIMATION
+# ----------------------------------------------------------------------------------- #
+
+rule create_purecn_mapping_bias:
+    output:
+        f"{config['dirs']['purecn_setup']}/mapping_bias_{config['purecn_assay_name']}_{config['purecn_genome']}.rds"
+    params: 
+        assay=config["purecn_assay_name"], 
+        genome=config["purecn_genome"], 
+        normal_panel_vcf=config["purecn_normal_panel_vcf"]
+    log:
+        f"{config['dirs']['logs']}/create_purecn_mapping_bias/log.txt"
+    conda:
+        f"{config['conda_env_dir']}/purecn.yaml"
+    shell:
+        "Rscript $(Rscript -e \"cat(system.file('extdata', 'NormalDB.R', package='PureCN'))\") --out-dir {config[dirs][purecn_setup]} --normal-panel {params.normal_panel_vcf} --assay {params.assay} --genome {params.genome} --force &> {log}"
+
+rule run_purecn:
+    input:
+        tumor_bam=lambda w: SAMPLES.loc[w.sample_id, "tumor_bam"],
+        vcf=lambda w: SAMPLES.loc[w.sample_id, "vcf"],
+        mapping_bias_db=rules.create_purecn_mapping_bias.output
+    output:
+        rds=f"{config['dirs']['purecn_runs']}/{{sample_id}}.rds",
+        csv=f"{config['dirs']['purecn_runs']}/{{sample_id}}.csv",
+        temp_dir=directory(temp(f"{config['dirs']['purecn_runs']}/temp_{{sample_id}}"))
+    params:
+        genome=config["purecn_genome"]
+    log:
+        f"{config['dirs']['logs']}/run_purecn/{{sample_id}}.log"
+    conda:
+        f"{config['conda_env_dir']}/purecn.yaml"
+    threads: config["default_threads"]
+    shell:
+        """
+        # Generate temporary CNR file for PureCN
+        cnvkit.py coverage {input.tumor_bam} {config[targets_bed]} -p {threads} -o {output.temp_dir}/temp.target.cnn &>> {log}
+        cnvkit.py coverage {input.tumor_bam} {config[access_bed]} -p {threads} -o {output.temp_dir}/temp.antitarget.cnn &>> {log}
+        cnvkit.py reference -f {config[reference_genome]} -t {config[targets_bed]} -a {config[access_bed]} -o {output.temp_dir}/temp.ref.cnn &>> {log}
+        cnvkit.py fix {output.temp_dir}/temp.target.cnn {output.temp_dir}/temp.antitarget.cnn {output.temp_dir}/temp.ref.cnn -o {output.temp_dir}/temp.cnr &>> {log}
+
+        # Run PureCN
+        Rscript $(Rscript -e \"cat(system.file('extdata', 'PureCN.R', package='PureCN'))\") --out {output.temp_dir}/{wildcards.sample_id} --sampleid {wildcards.sample_id} --tumor {output.temp_dir}/temp.cnr --vcf {input.vcf} --mapping-bias-file {input.mapping_bias_db} --genome {params.genome} --post-optimize --force --seed 123 &>> {log}
+        
+        # Move final outputs
+        mv {output.temp_dir}/{wildcards.sample_id}.csv {output.csv}
+        mv {output.temp_dir}/{wildcards.sample_id}.rds {output.rds}
+        """
+
+rule consolidate_purity:
+    input:
+        lambda w: f"{config['dirs']['purecn_runs']}/{w.sample_id}.csv" if w.sample_id in get_purecn_candidates() else []
+    output:
+        f"{config['dirs']['purity_values']}/{{sample_id}}.purity.txt"
+    params:
+        fallback_purity=lambda w: SAMPLES.loc[w.sample_id, "fallback_purity"],
+        purecn_csv_param=lambda w, input: input[0] if input else "None"
+    log:
+        f"{config['dirs']['logs']}/consolidate_purity/{{sample_id}}.log"
+    shell:
+        "python scripts/snakemake/helpers/consolidate_purity.py --purecn-csv {params.purecn_csv_param} --fallback-purity {params.fallback_purity} --output {output} &> {log}"
