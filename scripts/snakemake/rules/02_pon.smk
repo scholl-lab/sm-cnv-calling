@@ -60,19 +60,7 @@ rule cnvkit_reference_pooled:
         config["conda_envs"]["cnvkit"]
     shell:
         """
-        # Note: The 'cnvkit.py batch' command uses '--targets' and '--annotate' to create an
-        # intermediate, annotated target file. The 'cnvkit.py reference' command, however,
-        # does not have a direct '--annotate' flag. Annotation is part of the 'target'
-        # command. To handle this correctly in a modular pipeline, we should create an
-        # annotated target file first.
-        #
-        # CORRECTION: The best practice is to annotate the reference file itself. The
-        # `cnvkit reference` command DOES have an --annotate flag when building from
-        # coverage files. My previous thinking was incorrect. The logic below is what
-        # was intended.
-        # Let's adjust the logic slightly for robustness. `cnvkit reference` can be picky.
-        # We will build the command string carefully.
-
+        # Create pooled reference from clean normals, or fallback to flat reference
         if [ -s {input.normal_list} ]; then
             # Build reference from a panel of clean normals
             echo "Building pooled reference from {input.normal_list}" > {log}
