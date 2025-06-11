@@ -25,13 +25,28 @@ def get_tumor_samples():
     return SAMPLES[SAMPLES.analysis_type.isin(["TvsN", "To"])].index.tolist()
 
 def get_normal_bams_for_pon():
-    """Get normal BAM files from TvsN samples for Panel of Normals construction"""
+    """Get deduplicated normal BAM files from TvsN samples for Panel of Normals construction"""
     tvsn_samples = SAMPLES[SAMPLES.analysis_type == "TvsN"]
     normal_bams = {}
+    seen_bams = set()
+    
     for sample_id, row in tvsn_samples.iterrows():
         if pd.notna(row["normal_bam"]) and row["normal_bam"] != "":
-            # Use sample_id + "_normal" as the normal identifier
-            normal_bams[f"{sample_id}_normal"] = row["normal_bam"]
+            bam_path = row["normal_bam"]
+            # Only add if we haven't seen this BAM path before
+            if bam_path not in seen_bams:
+                # Create a unique identifier based on BAM filename
+                bam_basename = os.path.basename(bam_path).replace('.bam', '')
+                normal_id = f"{bam_basename}_normal"
+                # Handle potential filename conflicts by adding counter
+                counter = 1
+                original_normal_id = normal_id
+                while normal_id in normal_bams:
+                    normal_id = f"{original_normal_id}_{counter}"
+                    counter += 1
+                normal_bams[normal_id] = bam_path
+                seen_bams.add(bam_path)
+    
     return normal_bams
 
 def get_normal_sample_ids():
