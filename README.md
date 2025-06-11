@@ -240,19 +240,20 @@ The pipeline requires a tab-separated file with the following columns:
 
 | Type | Description | Required Files | Use Case |
 |------|-------------|----------------|----------|
-| `TvsN` | Tumor vs Normal | `tumor_bam`, `normal_bam`, `vcf` (optional) | Paired analysis with germline control |
-| `To` | Tumor only | `tumor_bam`, `vcf` (optional) | Single sample analysis |
-| `Normal` | Normal control | `normal_bam` | Panel of Normals contribution |
+| `TvsN` | Tumor vs Normal | `tumor_bam`, `normal_bam`, `vcf` (optional) | Paired analysis with germline control; normal BAM used for Panel of Normals |
+| `To` | Tumor only | `tumor_bam`, `vcf` (optional) | Single sample analysis without matched normal |
 
 #### Example Sample Sheet
 
 ```tsv
 sample_id	analysis_type	tumor_bam	normal_bam	vcf	fallback_purity
 PatientA	TvsN	/data/bams/PatientA_T.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA.vcf.gz	0.35
-PatientB	To	/data/bams/PatientB_T.bam		/data/vcfs/PatientB.vcf.gz	0.40
-Normal_01	Normal		/data/bams/Normal_01.bam		
-Normal_02	Normal		/data/bams/Normal_02.bam		
+PatientB	TvsN	/data/bams/PatientB_T.bam	/data/bams/PatientB_N.bam	/data/vcfs/PatientB.vcf.gz	0.40
+PatientC	To	/data/bams/PatientC_T.bam		/data/vcfs/PatientC.vcf.gz	0.30
+PatientD	To	/data/bams/PatientD_T.bam		/data/vcfs/PatientD.vcf.gz	0.45
 ```
+
+**Note**: The normal BAM files from `TvsN` samples are automatically used to construct the Panel of Normals (PoN) for improved CNV calling accuracy.
 
 ### BAM File Requirements
 

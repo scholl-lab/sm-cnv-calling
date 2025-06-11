@@ -6,7 +6,7 @@ ruleorder: cnvkit_reference_pooled > cnvkit_batch_tumor
 
 rule cnvkit_coverage_normals:
     input:
-        bam=lambda w: SAMPLES.loc[w.normal_id, "normal_bam"]
+        bam=lambda w: get_normal_bams_for_pon()[w.normal_id]
     output:
         target=f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.targetcoverage.cnn",
         antitarget=temp(f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.antitargetcoverage.cnn")

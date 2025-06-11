@@ -24,8 +24,19 @@ except FileNotFoundError:
 def get_tumor_samples():
     return SAMPLES[SAMPLES.analysis_type.isin(["TvsN", "To"])].index.tolist()
 
+def get_normal_bams_for_pon():
+    """Get normal BAM files from TvsN samples for Panel of Normals construction"""
+    tvsn_samples = SAMPLES[SAMPLES.analysis_type == "TvsN"]
+    normal_bams = {}
+    for sample_id, row in tvsn_samples.iterrows():
+        if pd.notna(row["normal_bam"]) and row["normal_bam"] != "":
+            # Use sample_id + "_normal" as the normal identifier
+            normal_bams[f"{sample_id}_normal"] = row["normal_bam"]
+    return normal_bams
+
 def get_normal_sample_ids():
-    return SAMPLES[SAMPLES.analysis_type == "Normal"].index.tolist()
+    """Get list of normal sample identifiers for PoN"""
+    return list(get_normal_bams_for_pon().keys())
 
 def get_purecn_candidates():
     return SAMPLES[(SAMPLES.analysis_type == "TvsN") & (SAMPLES.vcf.notna()) & (SAMPLES.vcf != "")].index.tolist()
