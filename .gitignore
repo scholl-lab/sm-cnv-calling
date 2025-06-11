@@ -334,3 +334,7 @@ docs/_build/
 
 # Lock files
 *.lock
+
+# download directories
+downloads/
+references/
