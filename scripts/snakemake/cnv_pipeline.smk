@@ -35,6 +35,13 @@ def get_purecn_candidates():
         (SAMPLES.analysis_type == "TvsN") & (SAMPLES.vcf.notna()) & (SAMPLES.vcf != "")
     ].index.tolist()
 
+def get_vcf_for_call(wildcards):
+    """Returns VCF path for cnvkit_call if available, empty list otherwise."""
+    sample_vcf = SAMPLES.loc[wildcards.sample_id, "vcf"]
+    if pd.notna(sample_vcf) and sample_vcf != "":
+        return [sample_vcf]
+    return []
+
 # ----------------------------------------------------------------------------------- #
 # Rule 'all': Defines the final targets of the workflow
 # ----------------------------------------------------------------------------------- #
@@ -72,11 +79,11 @@ rule run_purecn:
         vcf=lambda w: SAMPLES.loc[w.sample_id, "vcf"],
         mapping_bias_db=rules.create_purecn_mapping_bias.output.mapping_bias_db
     output:
-        rds=temp("results/02_purecn_runs/{sample_id}/{sample_id}.rds"),
+        rds="results/02_purecn_runs/{sample_id}.rds",
         csv="results/02_purecn_runs/{sample_id}.csv"
     params:
         genome=config["purecn_genome"],
-        out_dir="results/02_purecn_runs/{sample_id}"
+        out_dir="results/02_purecn_runs"
     log:
         "logs/purecn/run_purecn.{sample_id}.log"
     conda:
@@ -86,25 +93,32 @@ rule run_purecn:
         mem_mb=config["default_mem_mb"]
     shell:
         """
+        # Create sample-specific temp directory
+        mkdir -p {params.out_dir}/temp_{wildcards.sample_id}
+        
         # PureCN requires a .cnr file. We generate a temporary one using a flat reference.
         # This provides the necessary coverage info without needing the final PoN.
-        cnvkit.py coverage {input.tumor_bam} {config[targets_bed]} -p {threads} -o {params.out_dir}/temp.target.cnn &>> {log}
-        cnvkit.py coverage {input.tumor_bam} {config[access_bed]} -p {threads} -o {params.out_dir}/temp.antitarget.cnn &>> {log}
-        cnvkit.py reference -f {config[reference_genome]} -t {config[targets_bed]} -a {config[access_bed]} -o {params.out_dir}/temp.ref.cnn &>> {log}
-        cnvkit.py fix {params.out_dir}/temp.target.cnn {params.out_dir}/temp.antitarget.cnn {params.out_dir}/temp.ref.cnn -o {params.out_dir}/temp.cnr &>> {log}
+        cnvkit.py coverage {input.tumor_bam} {config[targets_bed]} -p {threads} -o {params.out_dir}/temp_{wildcards.sample_id}/temp.target.cnn &>> {log}
+        cnvkit.py coverage {input.tumor_bam} {config[access_bed]} -p {threads} -o {params.out_dir}/temp_{wildcards.sample_id}/temp.antitarget.cnn &>> {log}
+        cnvkit.py reference -f {config[reference_genome]} -t {config[targets_bed]} -a {config[access_bed]} -o {params.out_dir}/temp_{wildcards.sample_id}/temp.ref.cnn &>> {log}
+        cnvkit.py fix {params.out_dir}/temp_{wildcards.sample_id}/temp.target.cnn {params.out_dir}/temp_{wildcards.sample_id}/temp.antitarget.cnn {params.out_dir}/temp_{wildcards.sample_id}/temp.ref.cnn -o {params.out_dir}/temp_{wildcards.sample_id}/temp.cnr &>> {log}
 
         # Now run PureCN with the temporary CNR file
         Rscript $(Rscript -e "cat(system.file('extdata', 'PureCN.R', package='PureCN'))") \\
             --out {params.out_dir}/{wildcards.sample_id} \\
             --sampleid {wildcards.sample_id} \\
-            --tumor {params.out_dir}/temp.cnr \\
+            --tumor {params.out_dir}/temp_{wildcards.sample_id}/temp.cnr \\
             --vcf {input.vcf} \\
             --mapping-bias-file {input.mapping_bias_db} \\
             --genome {params.genome} \\
             --post-optimize --force --seed 123 &>> {log}
         
-        # Move the final CSV output to the main results directory for consolidation
+        # Move outputs to final locations
         mv {params.out_dir}/{wildcards.sample_id}.csv {output.csv}
+        mv {params.out_dir}/{wildcards.sample_id}.rds {output.rds}
+        
+        # Clean up temporary files
+        rm -rf {params.out_dir}/temp_{wildcards.sample_id}
         """
 
 rule consolidate_purity:
@@ -238,21 +252,20 @@ rule cnvkit_batch_tumor:
 rule cnvkit_call:
     input:
         cns=rules.cnvkit_batch_tumor.output.cns,
-        purity_file=rules.consolidate_purity.output.purity_file
+        purity_file=rules.consolidate_purity.output.purity_file,
+        vcf=get_vcf_for_call, # Helper function handles optional input
     output:
         call_cns="results/06_final_calls/{sample_id}.call.cns"
-    params:
-        vcf_path=lambda w: SAMPLES.loc[w.sample_id, "vcf"] if pd.notna(SAMPLES.loc[w.sample_id, "vcf"]) and SAMPLES.loc[w.sample_id, "vcf"] != "" else ""
     log:
         "logs/cnvkit/cnvkit_call.{sample_id}.log"
     conda:
         f"{config['conda_env_dir']}/cnvkit.yaml"
     shell:
         """
-        # Conditionally add the -v flag only if a VCF is provided for the sample
+        # Conditionally add the -v flag only if the input.vcf list is not empty
         VCF_PARAM=""
-        if [ -n "{params.vcf_path}" ] && [ -f "{params.vcf_path}" ]; then
-            VCF_PARAM="-v {params.vcf_path}"
+        if [ -n "{input.vcf}" ]; then
+            VCF_PARAM="-v {input.vcf}"
         fi
         
         cnvkit.py call {input.cns} \\
