@@ -19,9 +19,10 @@ rule cnvkit_batch_tumor:
     resources:
         mem_mb=config["cnvkit_batch_mem_mb"]
     shell:
-        # The --annotate flag is not needed here because the gene names are
-        # already baked into the pooled reference file.
-        "cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} --segment-threshold {config[segment_threshold]} -d {params.output_dir} &> {log}"
+        """
+        # Use cnvkit batch with default segmentation
+        cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} -d {params.output_dir} &> {log}
+        """
 
 rule cnvkit_call:
     input:

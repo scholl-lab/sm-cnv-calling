@@ -79,11 +79,13 @@ rule cnvkit_reference_pooled:
             # Build reference from a panel of clean normals - need both target and antitarget
             echo "Building pooled reference from {input.normal_list}" > {log}
             
-            # Extract clean normal IDs and create file patterns for both target and antitarget
-            CLEAN_PATTERN=$(cat {input.normal_list} | sed 's/\\.targetcoverage\\.cnn//' | sed 's|^|{config[dirs][pon_creation]}/coverage/|' | sed 's|$|.*coverage.cnn|' | tr '\\n' ' ')
+            # Extract clean normal IDs and create explicit file lists for both target and antitarget
+            CLEAN_TARGETS=$(cat {input.normal_list} | tr '\n' ' ')
+            CLEAN_ANTITARGETS=$(cat {input.normal_list} | sed 's/\.targetcoverage\.cnn/.antitargetcoverage.cnn/' | tr '\n' ' ')
+            CLEAN_FILES="$CLEAN_TARGETS $CLEAN_ANTITARGETS"
             
-            echo "Using coverage files matching pattern: $CLEAN_PATTERN" &>> {log}
-            cnvkit.py reference $CLEAN_PATTERN \\
+            echo "Using clean normal files: $CLEAN_FILES" &>> {log}
+            cnvkit.py reference $CLEAN_FILES \\
                 -f {config[reference_genome]} \\
                 -o {output.pooled_ref} &>> {log}
         else
