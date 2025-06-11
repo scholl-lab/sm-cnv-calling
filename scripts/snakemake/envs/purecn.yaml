@@ -4,5 +4,16 @@ channels:
   - defaults
 dependencies:
   - r-base
+  - r-optparse
   - r-r.utils
   - zlib
+  - bioconductor-purecn
+  - bioconductor-genomeinfodb
+  - bioconductor-genomeinfodbdata
+  - bioconductor-iranges
+  - bioconductor-genomicranges
+  - bioconductor-biostrings
+  - bioconductor-rsamtools
+  - bioconductor-dnacopy
+  - bioconductor-variantannotation
+  - bioconductor-rtracklayer

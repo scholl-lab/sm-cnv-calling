@@ -59,6 +59,9 @@ def get_normal_sample_ids():
     return list(get_normal_bams_for_pon().keys())
 
 def get_purecn_candidates():
+    """Get samples that can use PureCN (only if PureCN is not skipped)"""
+    if config.get("skip_purecn", False):
+        return []
     return SAMPLES[(SAMPLES.analysis_type == "TvsN") & (SAMPLES.vcf.notna()) & (SAMPLES.vcf != "")].index.tolist()
 
 def get_vcf_for_call(wildcards):

@@ -2,107 +2,108 @@
 # MODULE 1: PURITY ESTIMATION
 # ----------------------------------------------------------------------------------- #
 
-rule create_purecn_mapping_bias:
-    output:
-        f"{config['dirs']['purecn_setup']}/mapping_bias_{config['purecn_assay_name']}_{config['purecn_genome']}.rds"
-    params:
-        assay=config["purecn_assay_name"],
-        genome=config["purecn_genome"],
-        normal_panel_vcf=config["purecn_normal_panel_vcf"]
-    log:
-        f"{config['dirs']['logs']}/create_purecn_mapping_bias/log.txt"
-    conda:
-        config["conda_envs"]["purecn"]
-    shell:
-        """
-        
-        # Find and run the PureCN NormalDB.R script
-        echo "Finding PureCN NormalDB.R script..." &>> {log}
-        PURECN_SCRIPT=$(Rscript -e "cat(system.file('extdata', 'NormalDB.R', package='PureCN'))")
-        echo "Using PureCN script: $PURECN_SCRIPT" &>> {log}
-        
-        if [ -z "$PURECN_SCRIPT" ] || [ ! -f "$PURECN_SCRIPT" ]; then
-            echo "ERROR: PureCN NormalDB.R script not found!" &>> {log}
-            echo "Trying to list installed packages..." &>> {log}
-            Rscript -e "installed.packages()[,'Package']" &>> {log}
-            exit 1
-        fi
-        
-        Rscript "$PURECN_SCRIPT" \
-            --out-dir {config[dirs][purecn_setup]} \
-            --normal-panel {params.normal_panel_vcf} \
-            --assay {params.assay} \
-            --genome {params.genome} \
-            --force &>> {log}
-        """
+# Only include PureCN rules if not skipped
+if not config.get("skip_purecn", False):
+    rule create_purecn_mapping_bias:
+        output:
+            f"{config['dirs']['purecn_setup']}/mapping_bias_{config['purecn_assay_name']}_{config['purecn_genome']}.rds"
+        params:
+            assay=config["purecn_assay_name"],
+            genome=config["purecn_genome"],
+            normal_panel_vcf=config["purecn_normal_panel_vcf"]
+        log:
+            f"{config['dirs']['logs']}/create_purecn_mapping_bias/log.txt"
+        conda:
+            config["conda_envs"]["purecn"]
+        shell:
+            """
+            # Find and run the PureCN NormalDB.R script
+            echo "Finding PureCN NormalDB.R script..." > {log}
+            PURECN_SCRIPT=$(Rscript -e "cat(system.file('extdata', 'NormalDB.R', package='PureCN'))")
+            echo "Using PureCN script: $PURECN_SCRIPT" &>> {log}
+            
+            if [ -z "$PURECN_SCRIPT" ] || [ ! -f "$PURECN_SCRIPT" ]; then
+                echo "ERROR: PureCN NormalDB.R script not found!" &>> {log}
+                echo "Trying to list installed packages..." &>> {log}
+                Rscript -e "installed.packages()[,'Package']" &>> {log}
+                exit 1
+            fi
+            
+            Rscript "$PURECN_SCRIPT" \
+                --out-dir {config[dirs][purecn_setup]} \
+                --normal-panel {params.normal_panel_vcf} \
+                --assay {params.assay} \
+                --genome {params.genome} \
+                --force &>> {log}
+            """
 
-rule cnvkit_for_purecn:
-    input:
-        tumor_bam=lambda w: SAMPLES.loc[w.sample_id, "tumor_bam"]
-    output:
-        cnr=f"{config['dirs']['purecn_runs']}/{{sample_id}}_for_purecn.cnr",
-        temp_dir=directory(temp(f"{config['dirs']['purecn_runs']}/cnvkit_temp_{{sample_id}}"))
-    log:
-        f"{config['dirs']['logs']}/cnvkit_for_purecn/{{sample_id}}.log"
-    conda:
-        config["conda_envs"]["cnvkit"]
-    threads: config["default_threads"]
-    shell:
-        """
-        # Generate temporary coverage files and CNR file for PureCN
-        cnvkit.py coverage {input.tumor_bam} {config[targets_bed]} -p {threads} -o {output.temp_dir}/temp.target.cnn &> {log}
-        cnvkit.py coverage {input.tumor_bam} {config[access_bed]} -p {threads} -o {output.temp_dir}/temp.antitarget.cnn &>> {log}
-        cnvkit.py reference -f {config[reference_genome]} -t {config[targets_bed]} -a {config[access_bed]} -o {output.temp_dir}/temp.ref.cnn &>> {log}
-        cnvkit.py fix {output.temp_dir}/temp.target.cnn {output.temp_dir}/temp.antitarget.cnn {output.temp_dir}/temp.ref.cnn -o {output.cnr} &>> {log}
-        """
+    rule cnvkit_for_purecn:
+        input:
+            tumor_bam=lambda w: SAMPLES.loc[w.sample_id, "tumor_bam"]
+        output:
+            cnr=f"{config['dirs']['purecn_runs']}/{{sample_id}}_for_purecn.cnr",
+            temp_dir=directory(temp(f"{config['dirs']['purecn_runs']}/cnvkit_temp_{{sample_id}}"))
+        log:
+            f"{config['dirs']['logs']}/cnvkit_for_purecn/{{sample_id}}.log"
+        conda:
+            config["conda_envs"]["cnvkit"]
+        threads: config["default_threads"]
+        shell:
+            """
+            # Generate temporary coverage files and CNR file for PureCN
+            cnvkit.py coverage {input.tumor_bam} {config[targets_bed]} -p {threads} -o {output.temp_dir}/temp.target.cnn &> {log}
+            cnvkit.py coverage {input.tumor_bam} {config[access_bed]} -p {threads} -o {output.temp_dir}/temp.antitarget.cnn &>> {log}
+            cnvkit.py reference -f {config[reference_genome]} -t {config[targets_bed]} -a {config[access_bed]} -o {output.temp_dir}/temp.ref.cnn &>> {log}
+            cnvkit.py fix {output.temp_dir}/temp.target.cnn {output.temp_dir}/temp.antitarget.cnn {output.temp_dir}/temp.ref.cnn -o {output.cnr} &>> {log}
+            """
 
-rule run_purecn:
-    input:
-        cnr=rules.cnvkit_for_purecn.output.cnr,
-        vcf=lambda w: SAMPLES.loc[w.sample_id, "vcf"],
-        mapping_bias_db=rules.create_purecn_mapping_bias.output
-    output:
-        rds=f"{config['dirs']['purecn_runs']}/{{sample_id}}.rds",
-        csv=f"{config['dirs']['purecn_runs']}/{{sample_id}}.csv",
-        temp_dir=directory(temp(f"{config['dirs']['purecn_runs']}/purecn_temp_{{sample_id}}"))
-    params:
-        genome=config["purecn_genome"]
-    log:
-        f"{config['dirs']['logs']}/run_purecn/{{sample_id}}.log"
-    conda:
-        config["conda_envs"]["purecn"]
-    threads: config["default_threads"]
-    shell:
-        """
-        # Ensure PureCN is available (should already be set up by create_purecn_mapping_bias)
-        echo "Checking PureCN availability..." > {log}
-        
-        # Find and run the PureCN.R script
-        PURECN_SCRIPT=$(Rscript -e "cat(system.file('extdata', 'PureCN.R', package='PureCN'))")
-        echo "Using PureCN script: $PURECN_SCRIPT" &>> {log}
-        
-        if [ -z "$PURECN_SCRIPT" ] || [ ! -f "$PURECN_SCRIPT" ]; then
-            echo "ERROR: PureCN.R script not found! Running setup..." &>> {log}
-            Rscript {config[helpers_dir]}/setup_purecn_env.R &>> {log}
+    rule run_purecn:
+        input:
+            cnr=rules.cnvkit_for_purecn.output.cnr,
+            vcf=lambda w: SAMPLES.loc[w.sample_id, "vcf"],
+            mapping_bias_db=rules.create_purecn_mapping_bias.output
+        output:
+            rds=f"{config['dirs']['purecn_runs']}/{{sample_id}}.rds",
+            csv=f"{config['dirs']['purecn_runs']}/{{sample_id}}.csv",
+            temp_dir=directory(temp(f"{config['dirs']['purecn_runs']}/purecn_temp_{{sample_id}}"))
+        params:
+            genome=config["purecn_genome"]
+        log:
+            f"{config['dirs']['logs']}/run_purecn/{{sample_id}}.log"
+        conda:
+            config["conda_envs"]["purecn"]
+        threads: config["default_threads"]
+        shell:
+            """
+            # Ensure PureCN is available (should already be set up by create_purecn_mapping_bias)
+            echo "Checking PureCN availability..." > {log}
+            
+            # Find and run the PureCN.R script
             PURECN_SCRIPT=$(Rscript -e "cat(system.file('extdata', 'PureCN.R', package='PureCN'))")
-        fi
-        
-        # Run PureCN with the CNR file generated by CNVkit
-        Rscript "$PURECN_SCRIPT" \
-            --out {output.temp_dir}/{wildcards.sample_id} \
-            --sampleid {wildcards.sample_id} \
-            --tumor {input.cnr} \
-            --vcf {input.vcf} \
-            --mapping-bias-file {input.mapping_bias_db} \
-            --genome {params.genome} \
-            --post-optimize \
-            --force \
-            --seed 123 &>> {log}
+            echo "Using PureCN script: $PURECN_SCRIPT" &>> {log}
+            
+            if [ -z "$PURECN_SCRIPT" ] || [ ! -f "$PURECN_SCRIPT" ]; then
+                echo "ERROR: PureCN.R script not found! Running setup..." &>> {log}
+                Rscript {config[helpers_dir]}/setup_purecn_env.R &>> {log}
+                PURECN_SCRIPT=$(Rscript -e "cat(system.file('extdata', 'PureCN.R', package='PureCN'))")
+            fi
+            
+            # Run PureCN with the CNR file generated by CNVkit
+            Rscript "$PURECN_SCRIPT" \
+                --out {output.temp_dir}/{wildcards.sample_id} \
+                --sampleid {wildcards.sample_id} \
+                --tumor {input.cnr} \
+                --vcf {input.vcf} \
+                --mapping-bias-file {input.mapping_bias_db} \
+                --genome {params.genome} \
+                --post-optimize \
+                --force \
+                --seed 123 &>> {log}
 
-        # Move final outputs
-        mv {output.temp_dir}/{wildcards.sample_id}.csv {output.csv}
-        mv {output.temp_dir}/{wildcards.sample_id}.rds {output.rds}
-        """
+            # Move final outputs
+            mv {output.temp_dir}/{wildcards.sample_id}.csv {output.csv}
+            mv {output.temp_dir}/{wildcards.sample_id}.rds {output.rds}
+            """
 
 rule consolidate_purity:
     input:

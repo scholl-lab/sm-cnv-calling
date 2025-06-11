@@ -117,7 +117,15 @@ access_bed: "references/access-5k-mappable.hg19.bed"
 blacklist: "/path/to/your/genomic_blacklist.bed"
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"
 annotate_refFlat: "references/refFlat.txt"
+
+# Optional: Skip PureCN analysis entirely (default: false)
+skip_purecn: false
 ```
+
+**Skipping PureCN**: If you encounter issues with PureCN dependencies or want to run only CNVkit analysis, set `skip_purecn: true` in the config. This will:
+- Skip all PureCN-related rules and dependencies
+- Use only fallback purity values from the sample sheet
+- Still run the complete CNVkit workflow for CNV calling
 
 #### D. Prepare Sample Sheet
 

@@ -51,6 +51,9 @@ purecn_assay_name: "MyTumorAssay"
 pon_qc_metric_threshold: 0.3
 segment_threshold: 1.0e-4
 
+# Skip PureCN analysis (set to true to skip purity estimation)
+skip_purecn: false
+
 # ------------------
 # Plotting Parameters
 # ------------------
