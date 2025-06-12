@@ -49,6 +49,8 @@ rule cnvkit_call:
         vcf=get_vcf_for_call
     output:
         call_cns=f"{config['dirs']['final_calls']}/{{sample_id}}.call.cns"
+    params:
+        normal_sample_id=lambda w: SAMPLES.loc[w.sample_id, "normal_sample_id"] if pd.notna(SAMPLES.loc[w.sample_id, "normal_sample_id"]) and SAMPLES.loc[w.sample_id, "normal_sample_id"] != "" else ""
     log:
         f"{config['dirs']['logs']}/cnvkit_call/{{sample_id}}.log"
     conda:
@@ -57,7 +59,15 @@ rule cnvkit_call:
         """
         VCF_PARAM=""
         if [ -n "{input.vcf}" ]; then
-            VCF_PARAM="-v {input.vcf}"
+            VCF_PARAM="-v {input.vcf} -i {wildcards.sample_id}"
+            
+            # Add normal sample ID if provided
+            if [ -n "{params.normal_sample_id}" ]; then
+                VCF_PARAM="$VCF_PARAM -n {params.normal_sample_id}"
+                echo "Using normal sample: {params.normal_sample_id}" >> {log}
+            fi
+            
+            echo "VCF parameters: $VCF_PARAM" >> {log}
         fi
         cnvkit.py call {input.cns} $VCF_PARAM --purity $(cat {input.purity_file}) -m clonal -o {output.call_cns} &> {log}
         """

@@ -243,6 +243,7 @@ The pipeline requires a tab-separated file with the following columns:
 | `tumor_bam` | Conditional | Path to tumor BAM file | `/path/to/tumor.bam` |
 | `normal_bam` | Conditional | Path to normal BAM file | `/path/to/normal.bam` |
 | `vcf` | Optional | Path to variant VCF file | `/path/to/variants.vcf.gz` |
+| `normal_sample_id` | Optional | Normal sample ID in VCF for B-allele frequency calculation | `PatientA-N` |
 | `fallback_purity` | ✅ | Backup purity estimate (0-1) | `0.35` |
 
 #### Analysis Types
@@ -255,16 +256,17 @@ The pipeline requires a tab-separated file with the following columns:
 #### Example Sample Sheet
 
 ```tsv
-sample_id	analysis_type	tumor_bam	normal_bam	vcf	fallback_purity
-PatientA_T1	TvsN	/data/bams/PatientA_T1.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T1.vcf.gz	0.35
-PatientA_T2	TvsN	/data/bams/PatientA_T2.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T2.vcf.gz	0.40
-PatientB	TvsN	/data/bams/PatientB_T.bam	/data/bams/PatientB_N.bam	/data/vcfs/PatientB.vcf.gz	0.30
-PatientC	To	/data/bams/PatientC_T.bam		/data/vcfs/PatientC.vcf.gz	0.45
+sample_id	analysis_type	tumor_bam	normal_bam	vcf	normal_sample_id	fallback_purity
+PatientA_T1	TvsN	/data/bams/PatientA_T1.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T1.vcf.gz	PatientA-N	0.35
+PatientA_T2	TvsN	/data/bams/PatientA_T2.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T2.vcf.gz	PatientA-N	0.40
+PatientB	TvsN	/data/bams/PatientB_T.bam	/data/bams/PatientB_N.bam	/data/vcfs/PatientB.vcf.gz	PatientB-N	0.30
+PatientC	To	/data/bams/PatientC_T.bam		/data/vcfs/PatientC.vcf.gz		0.45
 ```
 
 **Note**: 
 - The normal BAM files from `TvsN` samples are automatically used to construct the Panel of Normals (PoN) for improved CNV calling accuracy.
 - **Multiple tumors per patient**: If the same normal BAM is used for multiple tumor samples (e.g., `PatientA_T1` and `PatientA_T2` both use `PatientA_N.bam`), the pipeline automatically deduplicates normal BAMs to avoid processing the same file multiple times in the PoN.
+- **Normal Sample ID in VCF**: For `TvsN` samples with VCF files, add a `normal_sample_id` column to specify the exact normal sample identifier in the VCF file. This enables proper B-allele frequency calculation from germline variants.
 
 ### BAM File Requirements
 
