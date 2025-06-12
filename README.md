@@ -234,6 +234,8 @@ Specify genes for focused plotting. Gene names should match your reference annot
 | `default_threads` | `4` | Default CPU cores per job |
 | `default_mem_mb` | `16000` | Default memory (MB) per job |
 | `cnvkit_batch_mem_mb` | `24000` | Memory for CNVkit batch processing |
+| `cnvkit_call_mem_mb` | `8000` | Memory for CNVkit call processing with VCFs |
+| `cnvkit_export_mem_mb` | `4000` | Memory for CNVkit VCF export |
 
 ## Input Formats
 

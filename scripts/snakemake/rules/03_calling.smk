@@ -61,6 +61,8 @@ rule cnvkit_call:
         f"{config['dirs']['logs']}/cnvkit_call/{{sample_id}}.log"
     conda:
         config["conda_envs"]["cnvkit"]
+    resources:
+        mem_mb=config["cnvkit_call_mem_mb"]
     shell:
         """
         VCF_PARAM=""
@@ -90,6 +92,8 @@ rule cnvkit_export_vcf:
         f"{config['dirs']['logs']}/cnvkit_export_vcf/{{sample_id}}.log"
     conda:
         config["conda_envs"]["cnvkit"]
+    resources:
+        mem_mb=config["cnvkit_export_mem_mb"]
     shell:
         """
         cnvkit.py export vcf {input.call_cns} -i {params.sample_id} | bgzip -c > {output.vcf}
