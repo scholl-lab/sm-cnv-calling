@@ -70,3 +70,6 @@ default_mem_mb: 16000
 cnvkit_batch_mem_mb: 24000
 cnvkit_call_mem_mb: 8000
 cnvkit_export_mem_mb: 4000
+cnvkit_plot_mem_mb: 6000
+# For large cohorts (>30 samples), consider increasing to 24000-32000 MB
+cnvkit_heatmap_mem_mb: 32000

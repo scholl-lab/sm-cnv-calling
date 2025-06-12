@@ -53,6 +53,8 @@ rule cnvkit_scatter_gene:
         f"{config['dirs']['logs']}/cnvkit_scatter_gene/{{sample_id}}.{{gene}}.log"
     conda:
         config["conda_envs"]["cnvkit"]
+    resources:
+        mem_mb=config["cnvkit_plot_mem_mb"]
     shell:
         """
         # Create sample-specific directory for gene plots
@@ -87,6 +89,8 @@ rule cnvkit_diagram:
         f"{config['dirs']['logs']}/cnvkit_diagram/{{sample_id}}.log"
     conda:
         config["conda_envs"]["cnvkit"]
+    resources:
+        mem_mb=config["cnvkit_plot_mem_mb"]
     shell:
         "cnvkit.py diagram {input.cnr} -s {input.cns} -o {output.pdf} &> {log}"
 
@@ -99,5 +103,7 @@ rule cnvkit_heatmap_cohort:
         f"{config['dirs']['logs']}/cnvkit_heatmap_cohort/log.txt"
     conda:
         config["conda_envs"]["cnvkit"]
+    resources:
+        mem_mb=config["cnvkit_heatmap_mem_mb"]
     shell:
         "cnvkit.py heatmap {input} -d -o {output.pdf} &> {log}"

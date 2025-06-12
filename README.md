@@ -236,6 +236,8 @@ Specify genes for focused plotting. Gene names should match your reference annot
 | `cnvkit_batch_mem_mb` | `24000` | Memory for CNVkit batch processing |
 | `cnvkit_call_mem_mb` | `8000` | Memory for CNVkit call processing with VCFs |
 | `cnvkit_export_mem_mb` | `4000` | Memory for CNVkit VCF export |
+| `cnvkit_plot_mem_mb` | `6000` | Memory for CNVkit individual plot operations |
+| `cnvkit_heatmap_mem_mb` | `24000` | Memory for CNVkit cohort heatmap generation (increase to 32000+ for >50 samples) |
 
 ## Input Formats
 
