@@ -8,11 +8,14 @@ rule cnvkit_batch_tumor:
         pooled_ref=f"{config['dirs']['pon_creation']}/pooled_reference.cnn"
     output:
         cnr=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cnr",
-        cns=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cns"
+        cns=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cns",
+        targetcoverage=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.targetcoverage.cnn",
+        antitargetcoverage=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.antitargetcoverage.cnn"
     log:
         f"{config['dirs']['logs']}/cnvkit_batch_tumor/{{sample_id}}.log"
     params:
-        output_dir=config['dirs']['cnvkit_runs']
+        output_dir=config['dirs']['cnvkit_runs'],
+        bam_basename=lambda w: get_cnvkit_basename(w.sample_id)
     conda:
         config["conda_envs"]["cnvkit"]
     threads: config["default_threads"]
@@ -20,12 +23,23 @@ rule cnvkit_batch_tumor:
         mem_mb=config["cnvkit_batch_mem_mb"]
     shell:
         """
-        # Use cnvkit batch with optional gene annotations
-        ANNOTATE_FLAG=""
-        if [ -n "{config[annotate_refFlat]}" ] && [ -f "{config[annotate_refFlat]}" ]; then
-            ANNOTATE_FLAG="--annotate {config[annotate_refFlat]}"
+        # Run CNVkit batch - output files will be named based on BAM basename
+        # Note: --annotate flag cannot be used with -r/--reference, annotations should be in the reference
+        cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} -d {params.output_dir} &> {log}
+        
+        # Move all CNVkit output files to expected sample_id-based names
+        mv {params.output_dir}/{params.bam_basename}.cnr {output.cnr}
+        mv {params.output_dir}/{params.bam_basename}.cns {output.cns}
+        mv {params.output_dir}/{params.bam_basename}.targetcoverage.cnn {output.targetcoverage}
+        mv {params.output_dir}/{params.bam_basename}.antitargetcoverage.cnn {output.antitargetcoverage}
+        
+        # Handle additional files that may be created (bintest.cns, call.cns) but are optional
+        if [ -f "{params.output_dir}/{params.bam_basename}.bintest.cns" ]; then
+            mv {params.output_dir}/{params.bam_basename}.bintest.cns {params.output_dir}/{wildcards.sample_id}.bintest.cns
         fi
-        cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} -d {params.output_dir} $ANNOTATE_FLAG &> {log}
+        if [ -f "{params.output_dir}/{params.bam_basename}.call.cns" ]; then
+            mv {params.output_dir}/{params.bam_basename}.call.cns {params.output_dir}/{wildcards.sample_id}.call.cns
+        fi
         """
 
 rule cnvkit_call:

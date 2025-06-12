@@ -81,6 +81,11 @@ def get_vcf_for_call(wildcards):
         # Sample ID not found in the dataframe
         return []
 
+def get_cnvkit_basename(sample_id):
+    """Get the basename that CNVkit will use for output files based on BAM filename"""
+    bam_path = SAMPLES.loc[sample_id, "tumor_bam"]
+    return os.path.splitext(os.path.basename(bam_path))[0]
+
 # --- Main Workflow Target ---
 rule all:
     input:

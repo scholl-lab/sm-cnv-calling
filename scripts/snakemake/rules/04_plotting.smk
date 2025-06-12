@@ -5,7 +5,7 @@
 rule cnvkit_scatter_genome:
     input:
         cnr=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cnr",
-        cns=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cns",
+        cns=f"{config['dirs']['final_calls']}/{{sample_id}}.call.cns",
         vcf=get_vcf_for_call,
     output:
         pdf=f"{config['dirs']['plots']}/scatter_genome/{{sample_id}}.genome.pdf"
@@ -25,7 +25,7 @@ rule cnvkit_scatter_genome:
 rule cnvkit_scatter_gene:
     input:
         cnr=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cnr",
-        cns=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cns",
+        cns=f"{config['dirs']['final_calls']}/{{sample_id}}.call.cns",
         vcf=get_vcf_for_call,
     output:
         pdf=f"{config['dirs']['plots']}/scatter_gene/{{sample_id}}.{{gene}}.pdf"
@@ -43,7 +43,7 @@ rule cnvkit_scatter_gene:
 rule cnvkit_diagram:
     input:
         cnr=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cnr",
-        cns=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cns",
+        cns=f"{config['dirs']['final_calls']}/{{sample_id}}.call.cns",
     output:
         pdf=f"{config['dirs']['plots']}/diagram/{{sample_id}}.diagram.pdf"
     log:
@@ -55,7 +55,7 @@ rule cnvkit_diagram:
 
 rule cnvkit_heatmap_cohort:
     input:
-        expand(f"{config['dirs']['cnvkit_runs']}/{{sample_id}}.cns", sample_id=get_tumor_samples())
+        expand(f"{config['dirs']['final_calls']}/{{sample_id}}.call.cns", sample_id=get_tumor_samples())
     output:
         pdf=f"{config['dirs']['plots']}/heatmap_cohort.pdf"
     log:
