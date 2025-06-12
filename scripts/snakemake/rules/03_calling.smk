@@ -14,7 +14,7 @@ rule cnvkit_batch_tumor:
     log:
         f"{config['dirs']['logs']}/cnvkit_batch_tumor/{{sample_id}}.log"
     params:
-        output_dir=config['dirs']['cnvkit_runs'],
+        output_dir=f"{config['dirs']['cnvkit_runs']}/{{sample_id}}_batch",
         bam_basename=lambda w: get_cnvkit_basename(w.sample_id)
     conda:
         config["conda_envs"]["cnvkit"]
@@ -23,11 +23,14 @@ rule cnvkit_batch_tumor:
         mem_mb=config["cnvkit_batch_mem_mb"]
     shell:
         """
+        # Create sample-specific output directory to avoid conflicts
+        mkdir -p {params.output_dir}
+        
         # Run CNVkit batch - output files will be named based on BAM basename
         # Note: --annotate flag cannot be used with -r/--reference, annotations should be in the reference
         cnvkit.py batch {input.tumor_bam} -r {input.pooled_ref} -p {threads} -d {params.output_dir} &> {log}
         
-        # Move all CNVkit output files to expected sample_id-based names
+        # Move all CNVkit output files to expected sample_id-based names in main output directory
         mv {params.output_dir}/{params.bam_basename}.cnr {output.cnr}
         mv {params.output_dir}/{params.bam_basename}.cns {output.cns}
         mv {params.output_dir}/{params.bam_basename}.targetcoverage.cnn {output.targetcoverage}
@@ -35,11 +38,14 @@ rule cnvkit_batch_tumor:
         
         # Handle additional files that may be created (bintest.cns, call.cns) but are optional
         if [ -f "{params.output_dir}/{params.bam_basename}.bintest.cns" ]; then
-            mv {params.output_dir}/{params.bam_basename}.bintest.cns {params.output_dir}/{wildcards.sample_id}.bintest.cns
+            mv {params.output_dir}/{params.bam_basename}.bintest.cns {config[dirs][cnvkit_runs]}/{wildcards.sample_id}.bintest.cns
         fi
         if [ -f "{params.output_dir}/{params.bam_basename}.call.cns" ]; then
-            mv {params.output_dir}/{params.bam_basename}.call.cns {params.output_dir}/{wildcards.sample_id}.call.cns
+            mv {params.output_dir}/{params.bam_basename}.call.cns {config[dirs][cnvkit_runs]}/{wildcards.sample_id}.call.cns
         fi
+        
+        # Clean up sample-specific directory after moving files
+        rm -rf {params.output_dir}
         """
 
 rule cnvkit_call:
