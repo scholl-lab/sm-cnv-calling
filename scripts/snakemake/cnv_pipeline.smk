@@ -92,7 +92,7 @@ rule all:
         expand(f"{config['dirs']['final_vcfs']}/{{sample_id}}.cnv.vcf.gz", sample_id=get_tumor_samples()),
         expand(f"{config['dirs']['plots']}/scatter_genome/{{sample_id}}.genome.pdf", sample_id=get_tumor_samples()),
         expand(f"{config['dirs']['plots']}/diagram/{{sample_id}}.diagram.pdf", sample_id=get_tumor_samples()),
-        expand(f"{config['dirs']['plots']}/scatter_gene/{{sample_id}}.{{gene}}.pdf", sample_id=get_tumor_samples(), gene=config["genes_of_interest"]),
+        expand(f"{config['dirs']['plots']}/scatter_gene/{{sample_id}}/{{gene}}.pdf", sample_id=get_tumor_samples(), gene=config["genes_of_interest"]),
         f"{config['dirs']['plots']}/heatmap_cohort.pdf",
         "results/pipeline_summary.csv"
 

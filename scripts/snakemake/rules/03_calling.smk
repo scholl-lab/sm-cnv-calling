@@ -56,7 +56,8 @@ rule cnvkit_call:
     output:
         call_cns=f"{config['dirs']['final_calls']}/{{sample_id}}.call.cns"
     params:
-        normal_sample_id=lambda w: SAMPLES.loc[w.sample_id, "normal_sample_id"] if pd.notna(SAMPLES.loc[w.sample_id, "normal_sample_id"]) and SAMPLES.loc[w.sample_id, "normal_sample_id"] != "" else ""
+        tumor_sample_id_vcf=lambda w: SAMPLES.loc[w.sample_id, "tumor_sample_id_vcf"] if pd.notna(SAMPLES.loc[w.sample_id, "tumor_sample_id_vcf"]) and SAMPLES.loc[w.sample_id, "tumor_sample_id_vcf"] != "" else "",
+        normal_sample_id_vcf=lambda w: SAMPLES.loc[w.sample_id, "normal_sample_id_vcf"] if pd.notna(SAMPLES.loc[w.sample_id, "normal_sample_id_vcf"]) and SAMPLES.loc[w.sample_id, "normal_sample_id_vcf"] != "" else ""
     log:
         f"{config['dirs']['logs']}/cnvkit_call/{{sample_id}}.log"
     conda:
@@ -67,12 +68,18 @@ rule cnvkit_call:
         """
         VCF_PARAM=""
         if [ -n "{input.vcf}" ]; then
-            VCF_PARAM="-v {input.vcf} -i {wildcards.sample_id}"
+            # Use tumor sample ID from VCF if specified, otherwise fallback to sample_id
+            TUMOR_ID="{params.tumor_sample_id_vcf}"
+            if [ -z "$TUMOR_ID" ]; then
+                TUMOR_ID="{wildcards.sample_id}"
+            fi
+            VCF_PARAM="-v {input.vcf} -i $TUMOR_ID"
+            echo "Using tumor sample ID: $TUMOR_ID" >> {log}
             
             # Add normal sample ID if provided
-            if [ -n "{params.normal_sample_id}" ]; then
-                VCF_PARAM="$VCF_PARAM -n {params.normal_sample_id}"
-                echo "Using normal sample: {params.normal_sample_id}" >> {log}
+            if [ -n "{params.normal_sample_id_vcf}" ]; then
+                VCF_PARAM="$VCF_PARAM -n {params.normal_sample_id_vcf}"
+                echo "Using normal sample ID: {params.normal_sample_id_vcf}" >> {log}
             fi
             
             echo "VCF parameters: $VCF_PARAM" >> {log}

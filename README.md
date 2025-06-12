@@ -250,7 +250,8 @@ The pipeline requires a tab-separated file with the following columns:
 | `tumor_bam` | Conditional | Path to tumor BAM file | `/path/to/tumor.bam` |
 | `normal_bam` | Conditional | Path to normal BAM file | `/path/to/normal.bam` |
 | `vcf` | Optional | Path to variant VCF file | `/path/to/variants.vcf.gz` |
-| `normal_sample_id` | Optional | Normal sample ID in VCF for B-allele frequency calculation | `PatientA-N` |
+| `tumor_sample_id_vcf` | Optional | Tumor sample ID in VCF for B-allele frequency calculation | `PatientA-T` |
+| `normal_sample_id_vcf` | Optional | Normal sample ID in VCF for B-allele frequency calculation | `PatientA-N` |
 | `fallback_purity` | ✅ | Backup purity estimate (0-1) | `0.35` |
 
 #### Analysis Types
@@ -263,17 +264,17 @@ The pipeline requires a tab-separated file with the following columns:
 #### Example Sample Sheet
 
 ```tsv
-sample_id	analysis_type	tumor_bam	normal_bam	vcf	normal_sample_id	fallback_purity
-PatientA_T1	TvsN	/data/bams/PatientA_T1.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T1.vcf.gz	PatientA-N	0.35
-PatientA_T2	TvsN	/data/bams/PatientA_T2.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T2.vcf.gz	PatientA-N	0.40
-PatientB	TvsN	/data/bams/PatientB_T.bam	/data/bams/PatientB_N.bam	/data/vcfs/PatientB.vcf.gz	PatientB-N	0.30
-PatientC	To	/data/bams/PatientC_T.bam		/data/vcfs/PatientC.vcf.gz		0.45
+sample_id	analysis_type	tumor_bam	normal_bam	vcf	tumor_sample_id_vcf	normal_sample_id_vcf	fallback_purity
+PatientA_T1	TvsN	/data/bams/PatientA_T1.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T1.vcf.gz	PatientA-T	PatientA-N	0.35
+PatientA_T2	TvsN	/data/bams/PatientA_T2.bam	/data/bams/PatientA_N.bam	/data/vcfs/PatientA_T2.vcf.gz	PatientA-T	PatientA-N	0.40
+PatientB	TvsN	/data/bams/PatientB_T.bam	/data/bams/PatientB_N.bam	/data/vcfs/PatientB.vcf.gz	PatientB-T	PatientB-N	0.30
+PatientC	To	/data/bams/PatientC_T.bam		/data/vcfs/PatientC.vcf.gz	PatientC-T		0.45
 ```
 
 **Note**: 
 - The normal BAM files from `TvsN` samples are automatically used to construct the Panel of Normals (PoN) for improved CNV calling accuracy.
 - **Multiple tumors per patient**: If the same normal BAM is used for multiple tumor samples (e.g., `PatientA_T1` and `PatientA_T2` both use `PatientA_N.bam`), the pipeline automatically deduplicates normal BAMs to avoid processing the same file multiple times in the PoN.
-- **Normal Sample ID in VCF**: For `TvsN` samples with VCF files, add a `normal_sample_id` column to specify the exact normal sample identifier in the VCF file. This enables proper B-allele frequency calculation from germline variants.
+- **VCF Sample IDs**: For samples with VCF files, add `tumor_sample_id_vcf` and `normal_sample_id_vcf` columns to specify the exact sample identifiers in the VCF file. This enables proper B-allele frequency calculation from germline variants and accurate VCF parsing when sample names in the VCF differ from the sample sheet IDs.
 
 ### BAM File Requirements
 
@@ -295,10 +296,21 @@ The pipeline generates organized outputs across multiple directories:
 
 ### 📊 Visualization Outputs (`results/08_plots/`)
 
-- **`{sample}_scatter.png`**: Copy number scatter plots across chromosomes
-- **`{sample}_diagram.png`**: Segmented copy number diagrams  
-- **`{sample}_genes.png`**: Gene-focused plots for regions of interest
-- **`cnv_heatmap.png`**: Cross-sample copy number heatmap
+- **`scatter_genome/{sample}.genome.pdf`**: Copy number scatter plots across chromosomes
+- **`diagram/{sample}.diagram.pdf`**: Segmented copy number diagrams  
+- **`scatter_gene/{sample}/{gene}.pdf`**: Gene-focused plots for regions of interest, organized by sample
+- **`heatmap_cohort.pdf`**: Cross-sample copy number heatmap
+
+**Note**: Gene-focused plots are organized into sample-specific subdirectories for better organization. For example, with samples `PatientA_T1`, `PatientB` and genes `TP53`, `MYC`, the structure would be:
+```
+results/08_plots/scatter_gene/
+├── PatientA_T1/
+│   ├── TP53.pdf
+│   └── MYC.pdf
+└── PatientB/
+    ├── TP53.pdf
+    └── MYC.pdf
+```
 
 ### 📄 Analysis Results
 
