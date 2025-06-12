@@ -22,10 +22,10 @@ dirs:
 # Reference Files (USER MUST UPDATE THESE PATHS)
 # ------------------
 reference_genome: "/path/to/your/ucsc.hg19.fasta"
-targets_bed: "/path/to/your/targets.bed"
+targets_bed: "/path/to/your/targets.bed"  # Raw targets BED - will be annotated by pipeline
 access_bed: "/path/to/your/access-5k-mappable.hg19.bed"
 blacklist: "/path/to/your/genomic_blacklist.bed" # Generic blacklist for contaminants or problematic regions
-# Optional annotation file for labeling genes if not present in the targets_bed.
+# Optional annotation file for labeling genes. Highly recommended for gene-focused analysis and plotting.
 # Comment out to disable annotation.
 annotate_refFlat: "references/refFlat.txt"
 purecn_normal_panel_vcf: "/path/to/your/normal_panel.vcf.gz"

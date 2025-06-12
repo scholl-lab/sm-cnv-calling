@@ -26,23 +26,28 @@ cnv_pipeline.smk (Main Controller)
 
 ### Pipeline Workflow
 
-1. **🧪 Purity Estimation** (`01_purity.smk`)
+1. **🎯 Target Preparation** (`02_pon.smk`)
+   - Annotate targets BED file with gene information from refFlat
+   - Split large regions for optimal bin sizes
+   - Create antitarget regions for off-target coverage
+
+2. **🧪 Purity Estimation** (`01_purity.smk`)
    - PureCN analysis for `TvsN` samples with VCF files
    - Fallback to user-supplied estimates for other cases
    - Consolidated purity values across all samples
 
-2. **📋 Panel of Normals Generation** (`02_pon.smk`)
+3. **📋 Panel of Normals Generation** (`02_pon.smk`)
    - CNVkit processing of all normal samples
    - Automated QC filtering based on noise metrics
    - Pooled reference creation from clean normals
 
-3. **🎯 CNV Calling** (`03_calling.smk`)
+4. **🎯 CNV Calling** (`03_calling.smk`)
    - Tumor sample processing with pooled reference
    - Contamination region exclusion
    - Absolute copy number calling with purity integration
    - VCF export for downstream analysis
 
-4. **📈 Visualization** (`04_plotting.smk`)
+5. **📈 Visualization** (`04_plotting.smk`)
    - Scatter plots showing copy number across chromosomes
    - Diagram plots for copy number segments
    - Heatmaps for cross-sample comparison
