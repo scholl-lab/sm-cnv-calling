@@ -37,7 +37,7 @@ cnv_pipeline.smk (Main Controller)
    - Consolidated purity values across all samples
 
 3. **📋 Panel of Normals Generation** (`02_pon.smk`)
-   - CNVkit processing of all normal samples
+   - Parallel CNVkit target and antitarget coverage calculation for all normal samples
    - Automated QC filtering based on noise metrics
    - Pooled reference creation from clean normals
 

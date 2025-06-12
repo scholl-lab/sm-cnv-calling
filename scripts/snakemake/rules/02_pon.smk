@@ -41,28 +41,38 @@ rule create_antitarget_bed:
     shell:
         "cnvkit.py antitarget {input.targets} -g {input.access} -o {output.antitargets} &> {log}"
 
-rule cnvkit_coverage_normals:
+rule cnvkit_coverage_normals_target:
     input:
         bam=lambda w: get_normal_bams_for_pon()[w.normal_id],
-        targets=rules.cnvkit_target.output.targets_annotated,
-        antitargets=rules.create_antitarget_bed.output.antitargets
+        targets=rules.cnvkit_target.output.targets_annotated
     output:
-        target=f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.targetcoverage.cnn",
-        antitarget=f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.antitargetcoverage.cnn"
+        target=f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.targetcoverage.cnn"
     log:
-        f"{config['dirs']['logs']}/cnvkit_coverage_normals/{{normal_id}}.log"
+        f"{config['dirs']['logs']}/cnvkit_coverage_normals_target/{{normal_id}}.log"
     conda:
         config["conda_envs"]["cnvkit"]
     threads: config["default_threads"]
     shell:
-        """
-        cnvkit.py coverage {input.bam} {input.targets} -p {threads} -o {output.target} &> {log}
-        cnvkit.py coverage {input.bam} {input.antitargets} -p {threads} -o {output.antitarget} &>> {log}
-        """
+        "cnvkit.py coverage {input.bam} {input.targets} -p {threads} -o {output.target} &> {log}"
+
+rule cnvkit_coverage_normals_antitarget:
+    input:
+        bam=lambda w: get_normal_bams_for_pon()[w.normal_id],
+        antitargets=rules.create_antitarget_bed.output.antitargets
+    output:
+        antitarget=f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.antitargetcoverage.cnn"
+    log:
+        f"{config['dirs']['logs']}/cnvkit_coverage_normals_antitarget/{{normal_id}}.log"
+    conda:
+        config["conda_envs"]["cnvkit"]
+    threads: config["default_threads"]
+    shell:
+        "cnvkit.py coverage {input.bam} {input.antitargets} -p {threads} -o {output.antitarget} &> {log}"
 
 rule cnvkit_metrics_normals:
     input:
-        expand(f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.targetcoverage.cnn", normal_id=get_normal_sample_ids())
+        target_coverages=expand(f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.targetcoverage.cnn", normal_id=get_normal_sample_ids()),
+        antitarget_coverages=expand(f"{config['dirs']['pon_creation']}/coverage/{{normal_id}}.antitargetcoverage.cnn", normal_id=get_normal_sample_ids())
     output:
         metrics_file=f"{config['dirs']['pon_creation']}/qc/all_normals.metrics.txt"
     log:
@@ -70,7 +80,7 @@ rule cnvkit_metrics_normals:
     conda:
         config["conda_envs"]["cnvkit"]
     shell:
-        "cnvkit.py metrics {input} > {output.metrics_file} 2> {log}"
+        "cnvkit.py metrics {input.target_coverages} > {output.metrics_file} 2> {log}"
 
 rule identify_clean_normals:
     input:
