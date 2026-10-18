@@ -64,3 +64,120 @@ rule cnvkit_filter_targets:
         """
 
 
+if CNVKIT_AUTOBIN:
+
+    rule cnvkit_autobin:
+        """Calibrate target and antitarget bin sizes automatically from cohort BAMs."""
+        input:
+            bams=lambda wc: [
+                BAM_PATH_MAP[bn] for bn in (get_normal_bams() or get_unique_bams()[:1])
+            ],
+            fasta=REF,
+            targets=get_targets_bed_for_binning,
+            access=get_access_bed,
+            ref_flat=[REF_FLAT] if REF_FLAT else [],
+        output:
+            targets=os.path.join(CNVKIT_REF_DIR, "targets.bed"),
+            antitargets=os.path.join(CNVKIT_REF_DIR, "antitargets.bed"),
+        params:
+            annotate_arg=f"--annotate {REF_FLAT}" if REF_FLAT else "",
+            extra=CNVKIT_AUTOBIN_EXTRA,
+        retries: 2
+        resources:
+            mem_mb=lambda wc, attempt: 8000 * attempt,
+            runtime=lambda wc, attempt: min(240 * attempt, 480),
+        conda:
+            "../envs/cnvkit.yaml"
+        log:
+            os.path.join(LOG_DIR, "cnvkit_autobin/autobin.log"),
+        benchmark:
+            os.path.join(LOG_DIR, "benchmarks/cnvkit_autobin/autobin.tsv")
+        shell:
+            r"""
+            cnvkit.py autobin {input.bams} \
+                -f {input.fasta} \
+                -t {input.targets} \
+                -g {input.access} \
+                --short-names \
+                {params.annotate_arg} \
+                {params.extra} \
+                --target-output-bed {output.targets} \
+                --antitarget-output-bed {output.antitargets} &> {log}
+            """
+
+else:
+
+    rule cnvkit_target:
+        """Prepare split, short-named target bins with optional refFlat gene annotation."""
+        input:
+            targets=get_targets_bed_for_binning,
+            ref_flat=[REF_FLAT] if REF_FLAT else [],
+        output:
+            targets=os.path.join(CNVKIT_REF_DIR, "targets.bed"),
+        params:
+            annotate_arg=f"--annotate {REF_FLAT}" if REF_FLAT else "",
+            avg_size_arg=(
+                f"--avg-size {CNVKIT_TARGET_AVG_SIZE}" if CNVKIT_TARGET_AVG_SIZE > 0 else ""
+            ),
+            extra=CNVKIT_TARGET_EXTRA,
+        retries: 2
+        resources:
+            mem_mb=lambda wc, attempt: 4000 * attempt,
+            runtime=lambda wc, attempt: min(60 * attempt, 480),
+        conda:
+            "../envs/cnvkit.yaml"
+        log:
+            os.path.join(LOG_DIR, "cnvkit_target/target.log"),
+        benchmark:
+            os.path.join(LOG_DIR, "benchmarks/cnvkit_target/target.tsv")
+        shell:
+            r"""
+            cnvkit.py target {input.targets} \
+                --split \
+                --short-names \
+                {params.annotate_arg} \
+                {params.avg_size_arg} \
+                {params.extra} \
+                -o {output.targets} &> {log}
+            """
+
+    rule cnvkit_antitarget:
+        """Generate off-target (antitarget) bins from accessible genome regions."""
+        input:
+            targets=os.path.join(CNVKIT_REF_DIR, "targets.bed"),
+            access=get_access_bed,
+        output:
+            antitargets=os.path.join(CNVKIT_REF_DIR, "antitargets.bed"),
+        params:
+            avg_size_arg=(
+                f"--avg-size {CNVKIT_ANTITARGET_AVG_SIZE}"
+                if CNVKIT_ANTITARGET_AVG_SIZE > 0
+                else ""
+            ),
+            min_size_arg=(
+                f"--min-size {CNVKIT_ANTITARGET_MIN_SIZE}"
+                if CNVKIT_ANTITARGET_MIN_SIZE > 0
+                else ""
+            ),
+            extra=CNVKIT_ANTITARGET_EXTRA,
+        retries: 2
+        resources:
+            mem_mb=lambda wc, attempt: 4000 * attempt,
+            runtime=lambda wc, attempt: min(60 * attempt, 480),
+        conda:
+            "../envs/cnvkit.yaml"
+        log:
+            os.path.join(LOG_DIR, "cnvkit_antitarget/antitarget.log"),
+        benchmark:
+            os.path.join(LOG_DIR, "benchmarks/cnvkit_antitarget/antitarget.tsv")
+        shell:
+            r"""
+            cnvkit.py antitarget {input.targets} \
+                -g {input.access} \
+                {params.avg_size_arg} \
+                {params.min_size_arg} \
+                {params.extra} \
+                -o {output.antitargets} &> {log}
+            """
+
+
