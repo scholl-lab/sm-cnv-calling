@@ -396,3 +396,58 @@ def build_cnvkit_vcf_args(
     return " ".join(parts)
 
 
+def identify_clean_normals(
+    metrics_file: str | Path,
+    coverage_dir: str | Path,
+    output_list: str | Path,
+    threshold: float = 0.3,
+) -> list[str]:
+    """Filter normal QC metrics by bivar <= threshold and resolve verified .cnn paths.
+
+    Writes both .targetcoverage.cnn and .antitargetcoverage.cnn paths for each
+    passing normal sample to output_list and returns the list of paths.
+    """
+    metrics_path = Path(metrics_file)
+    cov_dir = Path(coverage_dir)
+    out_path = Path(output_list)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if not metrics_path.exists() or metrics_path.stat().st_size == 0:
+        out_path.write_text("", encoding="utf-8")
+        return []
+
+    df = pd.read_csv(metrics_path, sep="\t")
+    if "sample" not in df.columns or "bivar" not in df.columns:
+        raise ValueError(f"Metrics file {metrics_file} must contain 'sample' and 'bivar' columns.")
+
+    df["bivar"] = pd.to_numeric(df["bivar"], errors="coerce")
+    clean_df = df[df["bivar"].notna() & (df["bivar"] <= float(threshold))]
+
+    resolved_paths: list[str] = []
+    seen_basenames: set[str] = set()
+    for raw_sample in clean_df["sample"].astype(str).tolist():
+        bn = os.path.basename(raw_sample.strip())
+        for suffix in (".targetcoverage.cnn", ".antitargetcoverage.cnn", ".cnn"):
+            if bn.endswith(suffix):
+                bn = bn[: -len(suffix)]
+                break
+        if bn in seen_basenames:
+            continue
+        seen_basenames.add(bn)
+
+        target_cnn = cov_dir / f"{bn}.targetcoverage.cnn"
+        antitarget_cnn = cov_dir / f"{bn}.antitargetcoverage.cnn"
+        if not target_cnn.is_file():
+            raise FileNotFoundError(f"Clean normal target coverage file not found: {target_cnn}")
+        if not antitarget_cnn.is_file():
+            raise FileNotFoundError(
+                f"Clean normal antitarget coverage file not found: {antitarget_cnn}"
+            )
+        resolved_paths.append(str(target_cnn))
+        resolved_paths.append(str(antitarget_cnn))
+
+    content = "\n".join(resolved_paths) + ("\n" if resolved_paths else "")
+    out_path.write_text(content, encoding="utf-8")
+    return resolved_paths
+
+

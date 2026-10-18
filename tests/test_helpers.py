@@ -277,3 +277,58 @@ class TestBedtoolsBlacklistSubtraction:
         assert "SVTYPE=DUP;END=150" in view_res.stdout
 
 
+class TestNormalPoNFiltering:
+    """Tests for Issue #6: normal QC metrics filtering and path resolution."""
+
+    def test_identify_clean_normals_resolves_target_and_antitarget_cnn(
+        self, tmp_path: Path
+    ) -> None:
+        """identify_clean_normals strips suffixes and outputs verified target+antitarget .cnn paths."""
+        cov_dir = tmp_path / "coverage"
+        cov_dir.mkdir()
+        for bn in ("N1", "N2", "N3"):
+            (cov_dir / f"{bn}.targetcoverage.cnn").write_text("cov\n", encoding="utf-8")
+            (cov_dir / f"{bn}.antitargetcoverage.cnn").write_text("cov\n", encoding="utf-8")
+
+        metrics_tsv = tmp_path / "normals_metrics.tsv"
+        pd.DataFrame(
+            [
+                {"sample": str(cov_dir / "N1.targetcoverage.cnn"), "bivar": 0.12, "mad": 0.1},
+                {"sample": "N2.cnn", "bivar": 0.45, "mad": 0.4},  # noisy -> excluded
+                {"sample": "N3", "bivar": 0.25, "mad": 0.2},
+            ]
+        ).to_csv(metrics_tsv, sep="\t", index=False)
+
+        out_list = tmp_path / "clean_normals.txt"
+        paths = identify_clean_normals(metrics_tsv, cov_dir, out_list, threshold=0.3)
+
+        assert paths == [
+            str(cov_dir / "N1.targetcoverage.cnn"),
+            str(cov_dir / "N1.antitargetcoverage.cnn"),
+            str(cov_dir / "N3.targetcoverage.cnn"),
+            str(cov_dir / "N3.antitargetcoverage.cnn"),
+        ]
+        assert out_list.read_text(encoding="utf-8").splitlines() == paths
+
+    def test_identify_clean_normals_empty_or_all_noisy(self, tmp_path: Path) -> None:
+        """Empty metrics file or all-noisy normals produce an empty clean_normals.txt without crashing."""
+        cov_dir = tmp_path / "coverage"
+        cov_dir.mkdir()
+        empty_metrics = tmp_path / "empty.tsv"
+        empty_metrics.write_text("", encoding="utf-8")
+        out_list = tmp_path / "clean_normals.txt"
+
+        assert identify_clean_normals(empty_metrics, cov_dir, out_list, threshold=0.3) == []
+        assert out_list.read_text(encoding="utf-8") == ""
+
+        noisy_metrics = tmp_path / "noisy.tsv"
+        pd.DataFrame([{"sample": "N1", "bivar": 0.85}]).to_csv(
+            noisy_metrics, sep="\t", index=False
+        )
+        assert identify_clean_normals(noisy_metrics, cov_dir, out_list, threshold=0.3) == []
+        assert out_list.read_text(encoding="utf-8") == ""
+
+
+class TestPureCNConsolidationAndCallArgs:
+    """Tests for Issue #7 & #8: purity/ploidy consolidation, sex inference, and cnvkit call flags."""
+
