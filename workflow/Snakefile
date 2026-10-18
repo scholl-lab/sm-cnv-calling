@@ -1,0 +1,76 @@
+"""sm-cnv-calling: Somatic copy-number calling pipeline (CNVkit + PureCN).
+
+Requires Snakemake 8.0+. Uses the SLURM executor plugin for cluster execution.
+"""
+
+from pathlib import Path
+import sys
+
+from snakemake.utils import min_version, validate
+
+min_version("8.0")
+
+import pandas as pd
+
+_WORKFLOW_DIR = Path(workflow.snakefile).resolve().parent
+_REPO_ROOT = _WORKFLOW_DIR.parent
+for _p in (str(_WORKFLOW_DIR), str(_WORKFLOW_DIR / "rules")):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+from rules.helpers import validate_samples_df
+
+
+# -- Configuration -----------------------------------------------------------
+if not workflow.overwrite_configfiles:
+
+    configfile: str(_REPO_ROOT / "config" / "config.yaml")
+
+
+validate(config, "schemas/config.schema.yaml")
+
+_samples_path = Path(config["paths"]["samples"])
+if not _samples_path.is_absolute() and not _samples_path.exists():
+    _candidate = _REPO_ROOT / _samples_path
+    if _candidate.exists():
+        _samples_path = _candidate
+
+samples_df = pd.read_table(_samples_path, dtype=str, keep_default_na=False).set_index(
+    "sample", drop=False, verify_integrity=True
+)
+validate(samples_df, "schemas/samples.schema.yaml")
+validate_samples_df(samples_df)
+
+
+# -- Includes ----------------------------------------------------------------
+include: "rules/common.smk"
+include: "rules/cnvkit.smk"
+include: "rules/purecn.smk"
+include: "rules/qc.smk"
+
+
+# -- Cross-field validation --------------------------------------------------
+if PURECN_ENABLED and PURECN_MODE == "native" and get_purecn_units():
+    if not get_normal_bams() and not PURECN_NORMALDB:
+        raise ValueError(
+            "PureCN native mode is enabled without normal BAMs in samples.tsv "
+            "and without a pre-built 'purecn.normaldb'. Either add normal BAMs "
+            "or provide 'purecn.normaldb' and 'purecn.mapping_bias'."
+        )
+    if (
+        not get_normal_bams()
+        and PURECN_NORMALDB
+        and not PURECN_MAPPING_BIAS
+        and not PURECN_NORMAL_PANEL_VCF
+    ):
+        raise ValueError(
+            "PureCN native mode with a pre-built normalDB and no normal BAMs "
+            "requires 'purecn.mapping_bias' or 'purecn.normal_panel_vcf'."
+        )
+
+
+# -- Target rule -------------------------------------------------------------
+rule all:
+    localrule: True
+    input:
+        get_final_outputs(),

@@ -1,0 +1,88 @@
+# sm-cnv-calling unified configuration (GRCh38 defaults)
+# Somatic copy-number calling with CNVkit and PureCN.
+
+# --- Reference genome & capture targets ---
+ref:
+  genome: "resources/ref/GRCh38/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna"
+  build: "GRCh38"
+  targets_bed: "resources/targets/capture_targets.bed"
+  baits_bed: ""          # Optional: capture baits BED (defaults to targets_bed for PureCN)
+  access_bed: ""         # Optional: pre-computed accessible regions BED (auto-generated via cnvkit.py access if empty)
+  blacklist_bed: ""      # Optional: ENCODE/genomic blacklist BED excluded from targets and access regions
+  ref_flat: ""           # Optional: UCSC refFlat.txt for gene annotation in cnvkit target/autobin
+  mappability_bw: ""     # Optional: mappability BigWig for PureCN IntervalFile.R
+  reptiming_bw: ""       # Optional: replication timing BigWig for PureCN IntervalFile.R
+
+# --- Input / output paths ---
+paths:
+  samples: "config/samples.tsv"
+  bam_folder: "results/exomes/bqsr"
+  vcf_folder: "results/exomes/variant_calls"
+  output_folder: "results/exomes/cnv_calls"
+  log_subdir: "logs"
+
+# --- BAM file settings ---
+bam:
+  file_extension: ".merged.dedup.bqsr.bam"
+
+# --- CNVkit settings ---
+cnvkit:
+  reference_cnn: ""              # Optional: pre-built pooled_reference.cnn (skips PoN construction)
+  autobin: false                 # Run cnvkit.py autobin to estimate target/antitarget bin sizes
+  target_avg_size: 200           # Target average bin size in bp (--avg-size for cnvkit target; 0 uses tool default)
+  antitarget_avg_size: 150000    # Antitarget average bin size in bp (--avg-size for cnvkit antitarget; 0 uses tool default)
+  antitarget_min_size: 500       # Antitarget minimum bin size in bp (--min-size for cnvkit antitarget; 0 uses tool default)
+  access_min_gap_size: 5000      # Minimum gap size in bp (-s for cnvkit access)
+  pon_bivar_threshold: 0.3       # Max bivar noise metric for normal inclusion in pooled reference
+  male_reference: false          # Use male reference (-y / --male-reference)
+  segment_method: "cbs"          # Segmentation algorithm: cbs | flasso | haar | none | hmm | hmm-tumor | hmm-germline
+  segment_threshold: 1.0e-4      # Segmentation p-value/quantile threshold (-t for cnvkit segment)
+  drop_low_coverage: true        # Pass --drop-low-coverage to cnvkit segment and call
+  call_method: "clonal"          # Calling method when purity/ploidy is known: clonal | threshold | none
+  call_filter: "ci"              # Segment filter for cnvkit call (--filter): ci | cn | sem | ampdel | none
+  min_variant_depth: 20          # Minimum variant depth (-m) for VCF BAF extraction
+  genes_of_interest:
+    - "TP53"
+    - "MYC"
+    - "EGFR"
+    - "ERBB2"
+
+# --- PureCN settings ---
+purecn:
+  enabled: true                  # Enable PureCN tumor purity and ploidy estimation
+  mode: "cnvkit"                 # "cnvkit" (PoN-normalized CNR + seg) | "native" (IntervalFile + Coverage + NormalDB)
+  genome: "hg38"                 # "hg19" | "hg38"
+  assay: "exome"                 # Assay identifier for NormalDB mapping bias
+  fun_segmentation: "none"       # PureCN segmentation function in cnvkit mode: none | PSCBS | CBS | Hclust
+  normal_panel_vcf: ""           # Optional: normal panel VCF for mapping bias estimation
+  normaldb: ""                   # Optional: pre-built normalDB.rds (for native mode)
+  mapping_bias: ""               # Optional: pre-built mapping_bias.rds
+  snp_blacklist: ""              # Optional: simple repeats / SNP blacklist BED for PureCN
+  seed: 123
+  postoptimize: true
+  extra: ""
+
+# --- Tool-specific passthrough parameters ---
+params:
+  cnvkit:
+    segment_method: "cbs"
+    segment_threshold: 1.0e-4
+    access_extra: ""
+    target_extra: ""
+    antitarget_extra: ""
+    autobin_extra: ""
+    coverage_extra: ""
+    reference_extra: ""
+    fix_extra: ""
+    segment_extra: ""
+    segmetrics_extra: ""
+    call_extra: ""
+    bintest_extra: ""
+    scatter_extra: ""
+    diagram_extra: ""
+    heatmap_extra: ""
+  purecn:
+    intervalfile_extra: ""
+    coverage_extra: ""
+    normaldb_extra: ""
+    run_extra: ""

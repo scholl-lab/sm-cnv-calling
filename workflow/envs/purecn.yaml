@@ -1,0 +1,10 @@
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - bioconductor-purecn=2.12.0
+  - bioconductor-dnacopy=1.78.0
+  - r-pscbs=0.67.0
+  - r-optparse=1.7.5
+  - r-r.utils=2.12.3
