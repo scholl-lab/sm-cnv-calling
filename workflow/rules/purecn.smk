@@ -105,25 +105,25 @@ if PURECN_ENABLED:
                 --intervals {input.intervals} \
                 --outdir {params.outdir} \
                 {params.extra} &> {log}
+            RAW_LOESS="{params.outdir}/$(basename "{input.bam}" .bam)_coverage_loess.txt.gz"
+            if [ "$RAW_LOESS" != "{output.coverage}" ] && [ -f "$RAW_LOESS" ]; then
+                mv "$RAW_LOESS" "{output.coverage}"
+            fi
             """
 
     rule purecn_normaldb:
-        """Build PureCN normalDB.rds and mapping_bias.rds from normal BAM coverages (native mode)."""
+        """Build PureCN normalDB RDS from normal BAM coverages (native mode)."""
         input:
             coverages=lambda wc: [
                 os.path.join(PURECN_COV_DIR, f"{bn}_coverage_loess.txt.gz")
                 for bn in get_normal_bams()
             ],
-            normal_panel=[PURECN_NORMAL_PANEL_VCF] if PURECN_NORMAL_PANEL_VCF else [],
         output:
-            normaldb=os.path.join(PURECN_REF_DIR, "normalDB.rds"),
-            bias=os.path.join(PURECN_REF_DIR, "mapping_bias.rds"),
+            normaldb=os.path.join(PURECN_REF_DIR, f"normalDB_{PURECN_GENOME}.rds"),
+            manifest=os.path.join(PURECN_REF_DIR, "normal_coverages.list"),
         params:
             outdir=PURECN_REF_DIR,
             genome=PURECN_GENOME,
-            normal_panel_arg=(
-                f"--normal-panel {PURECN_NORMAL_PANEL_VCF}" if PURECN_NORMAL_PANEL_VCF else ""
-            ),
             extra=PURECN_NORMALDB_EXTRA,
         retries: 2
         resources:
@@ -137,22 +137,15 @@ if PURECN_ENABLED:
             os.path.join(LOG_DIR, "benchmarks/purecn_normaldb/normaldb.tsv")
         shell:
             r"""
+            mkdir -p {params.outdir}
+            printf "%s\n" {input.coverages} > {output.manifest}
             PURECN=$(Rscript -e 'cat(system.file("extdata", package = "PureCN"))')
             Rscript "$PURECN/NormalDB.R" \
-                --coveragefiles {input.coverages} \
+                --coveragefiles {output.manifest} \
                 --outdir {params.outdir} \
                 --genome {params.genome} \
-                {params.normal_panel_arg} \
                 {params.extra} \
                 --force &> {log}
-            if [ ! -f "{output.bias}" ]; then
-                FOUND_BIAS=$(ls {params.outdir}/mapping_bias*.rds 2>/dev/null | head -n 1 || true)
-                if [ -n "$FOUND_BIAS" ]; then
-                    cp "$FOUND_BIAS" "{output.bias}"
-                else
-                    touch "{output.bias}"
-                fi
-            fi
             """
 
     def _purecn_run_tumor_input(wildcards):
@@ -293,19 +286,19 @@ rule consolidate_purity:
         os.path.join(LOG_DIR, "consolidate_purity/{unit}.log"),
     shell:
         r"""
-        python3 -c '
+        python3 - <<'PY' &> {log}
 import sys
-sys.path.insert(0, "{params.rules_dir}")
+sys.path.insert(0, {params.rules_dir!r})
 from helpers import consolidate_purity_ploidy
 consolidate_purity_ploidy(
-    unit="{wildcards.unit}",
-    sample="{params.sample}",
-    output_file="{output.tsv}",
-    purecn_csv="{params.purecn_csv}",
-    purecn_status_file="{params.purecn_status}",
-    sample_purity="{params.sample_purity}",
-    sample_ploidy="{params.sample_ploidy}",
+    unit={wildcards.unit!r},
+    sample={params.sample!r},
+    output_file={output.tsv!r},
+    purecn_csv={params.purecn_csv!r},
+    purecn_status_file={params.purecn_status!r},
+    sample_purity={params.sample_purity!r},
+    sample_ploidy={params.sample_ploidy!r},
     purecn_attempted=bool({params.purecn_attempted}),
 )
-' &> {log}
+PY
         """

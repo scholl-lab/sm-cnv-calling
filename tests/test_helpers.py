@@ -21,6 +21,7 @@ from workflow.rules.helpers import (
     build_cnvkit_vcf_args,
     build_pipeline_summary,
     consolidate_purity_ploidy,
+    extract_reference_regions,
     get_cnv_units,
     get_normal_bam_basenames,
     get_tumor_samples,
@@ -200,14 +201,61 @@ class TestSampleSheetAndBamResolution:
             resolve_sample_vcf_stats(df_explicit, "PAT1", vcf_dir) == "/custom/PAT1.vcf.gz.stats"
         )
 
-    def test_build_cnvkit_vcf_args(self) -> None:
-        """build_cnvkit_vcf_args formats -v, -i, -n, -m flags properly."""
+    def test_build_cnvkit_vcf_args_cli_validation(self) -> None:
+        """build_cnvkit_vcf_args uses --min-variant-depth so segment/call -m method is never clobbered."""
+        import argparse
+        import shlex
+
         assert build_cnvkit_vcf_args("") == ""
+        vcf_args = build_cnvkit_vcf_args("pat1.vcf.gz", "T1", "N1", 20)
+        assert vcf_args == "-v pat1.vcf.gz -i T1 -n N1 --min-variant-depth 20"
         assert (
-            build_cnvkit_vcf_args("pat1.vcf.gz", "T1", "N1", 20)
-            == "-v pat1.vcf.gz -i T1 -n N1 -m 20"
+            build_cnvkit_vcf_args("to1.vcf.gz", "TO1", "", 15)
+            == "-v to1.vcf.gz -i TO1 --min-variant-depth 15"
         )
-        assert build_cnvkit_vcf_args("to1.vcf.gz", "TO1", "", 15) == "-v to1.vcf.gz -i TO1 -m 15"
+
+        # Validate against CNVkit's segment, call, and scatter CLI flag definitions
+        for method_choices, method_val in (
+            (("cbs", "flasso", "haar", "none", "hmm"), "cbs"),
+            (("threshold", "clonal", "none"), "clonal"),
+        ):
+            parser = argparse.ArgumentParser()
+            parser.add_argument("-m", "--method", choices=method_choices, required=True)
+            parser.add_argument("-v", "--vcf")
+            parser.add_argument("-i", "--sample-id")
+            parser.add_argument("-n", "--normal-id")
+            parser.add_argument("--min-variant-depth", type=int, default=20)
+            parsed = parser.parse_args(shlex.split(f"-m {method_val} {vcf_args}"))
+            assert parsed.method == method_val
+            assert parsed.vcf == "pat1.vcf.gz"
+            assert parsed.sample_id == "T1"
+            assert parsed.normal_id == "N1"
+            assert parsed.min_variant_depth == 20
+
+    def test_extract_reference_regions(self, tmp_path: Path) -> None:
+        """extract_reference_regions splits prebuilt .cnn into target and antitarget BED4 files."""
+        ref_cnn = tmp_path / "prebuilt_ref.cnn"
+        ref_cnn.write_text(
+            "chromosome\tstart\tend\tgene\tlog2\tdepth\tgc\trmask\tspread\n"
+            "chr1\t120\t260\tTP53\t0.0\t100.0\t0.5\t0.0\t0.05\n"
+            "chr1\t260\t900\tAntitarget\t0.0\t10.0\t0.4\t0.1\t0.08\n"
+            "chr2\t50\t400\tBackground\t0.0\t8.0\t0.4\t0.0\t0.09\n"
+            "chr2\t500\t650\tEGFR\t0.0\t120.0\t0.55\t0.0\t0.04\n",
+            encoding="utf-8",
+        )
+        targets_bed = tmp_path / "targets.bed"
+        antitargets_bed = tmp_path / "antitargets.bed"
+        t_df, a_df = extract_reference_regions(ref_cnn, targets_bed, antitargets_bed)
+        assert len(t_df) == 2
+        assert len(a_df) == 2
+        assert targets_bed.read_text(encoding="utf-8").splitlines() == [
+            "chr1\t120\t260\tTP53",
+            "chr2\t500\t650\tEGFR",
+        ]
+        assert antitargets_bed.read_text(encoding="utf-8").splitlines() == [
+            "chr1\t260\t900\tAntitarget",
+            "chr2\t50\t400\tBackground",
+        ]
 
 
 class TestBedtoolsBlacklistSubtraction:

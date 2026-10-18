@@ -180,19 +180,19 @@ rule create_summary_report:
         os.path.join(LOG_DIR, "create_summary_report/summary.log"),
     shell:
         r"""
-        python3 -c '
+        python3 - <<'PY' &> {log}
 import sys
-sys.path.insert(0, "{params.rules_dir}")
+sys.path.insert(0, {params.rules_dir!r})
 from helpers import build_pipeline_summary
 build_pipeline_summary(
     units_meta={params.units_meta!r},
-    purity_files={input.purity_files!r},
-    sex_files={input.sex_files!r},
-    tumor_metrics_files={input.tumor_metrics!r},
-    normal_metrics_file="{params.normal_metrics_path}" or None,
-    clean_normals_file="{params.clean_normals_path}" or None,
-    output_summary_tsv="{output.summary}",
-    output_normal_qc_tsv="{output.normal_qc}",
+    purity_files=list({input.purity_files!r}),
+    sex_files=list({input.sex_files!r}),
+    tumor_metrics_files=list({input.tumor_metrics!r}),
+    normal_metrics_file={params.normal_metrics_path!r} or None,
+    clean_normals_file={params.clean_normals_path!r} or None,
+    output_summary_tsv={output.summary!r},
+    output_normal_qc_tsv={output.normal_qc!r},
 )
-' &> {log}
+PY
         """

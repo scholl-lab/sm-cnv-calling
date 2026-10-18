@@ -55,17 +55,7 @@ if PURECN_ENABLED and PURECN_MODE == "native" and get_purecn_units():
         raise ValueError(
             "PureCN native mode is enabled without normal BAMs in samples.tsv "
             "and without a pre-built 'purecn.normaldb'. Either add normal BAMs "
-            "or provide 'purecn.normaldb' and 'purecn.mapping_bias'."
-        )
-    if (
-        not get_normal_bams()
-        and PURECN_NORMALDB
-        and not PURECN_MAPPING_BIAS
-        and not PURECN_NORMAL_PANEL_VCF
-    ):
-        raise ValueError(
-            "PureCN native mode with a pre-built normalDB and no normal BAMs "
-            "requires 'purecn.mapping_bias' or 'purecn.normal_panel_vcf'."
+            "or provide 'purecn.normaldb'."
         )
 
 

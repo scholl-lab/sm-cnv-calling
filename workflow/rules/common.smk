@@ -20,7 +20,7 @@ from rules.helpers import (
 )
 
 try:
-    RULES_DIR = str(Path(workflow.snakefile).resolve().parent / "rules")
+    RULES_DIR = str(_WORKFLOW_DIR / "rules")
 except NameError:
     RULES_DIR = str(Path(__file__).resolve().parent)
 
@@ -134,6 +134,11 @@ BAM_PATH_MAP = _get_bam_path_map_impl(samples_df, BAM_FOLDER, BAM_EXT)
 CNV_UNITS = _get_cnv_units_impl(samples_df, BAM_EXT)
 
 
+wildcard_constraints:
+    unit=r"(?!.*\.segmetrics$)[^/]+",
+    bam_basename=r"[^/]+",
+
+
 def get_all_samples():
     return _get_samples_impl(samples_df)
 
@@ -236,18 +241,16 @@ def get_purecn_mapping_bias_path():
     """Return path to PureCN mapping_bias.rds if configured or generated."""
     if PURECN_MAPPING_BIAS:
         return PURECN_MAPPING_BIAS
-    if PURECN_MODE == "native" and (get_normal_bams() or PURECN_NORMAL_PANEL_VCF):
-        return os.path.join(PURECN_REF_DIR, "mapping_bias.rds")
     if PURECN_NORMAL_PANEL_VCF:
         return os.path.join(PURECN_REF_DIR, f"mapping_bias_{PURECN_ASSAY}_{PURECN_GENOME}.rds")
     return ""
 
 
 def get_purecn_normaldb_path():
-    """Return path to PureCN normalDB.rds in native mode."""
+    """Return path to PureCN normalDB RDS in native mode."""
     if PURECN_NORMALDB:
         return PURECN_NORMALDB
-    return os.path.join(PURECN_REF_DIR, "normalDB.rds")
+    return os.path.join(PURECN_REF_DIR, f"normalDB_{PURECN_GENOME}.rds")
 
 
 def get_final_outputs():

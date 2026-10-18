@@ -64,7 +64,31 @@ rule cnvkit_filter_targets:
         """
 
 
-if CNVKIT_AUTOBIN:
+if CNVKIT_REFERENCE_CNN:
+
+    rule cnvkit_extract_reference_bins:
+        """Extract target and antitarget BED4 intervals from a pre-built reference.cnn."""
+        localrule: True
+        input:
+            reference=CNVKIT_REFERENCE_CNN,
+        output:
+            targets=os.path.join(CNVKIT_REF_DIR, "targets.bed"),
+            antitargets=os.path.join(CNVKIT_REF_DIR, "antitargets.bed"),
+        params:
+            rules_dir=RULES_DIR,
+        log:
+            os.path.join(LOG_DIR, "cnvkit_extract_reference_bins/extract_bins.log"),
+        shell:
+            r"""
+            python3 - <<'PY' &> {log}
+import sys
+sys.path.insert(0, {params.rules_dir!r})
+from helpers import extract_reference_regions
+extract_reference_regions({input.reference!r}, {output.targets!r}, {output.antitargets!r})
+PY
+            """
+
+elif CNVKIT_AUTOBIN:
 
     rule cnvkit_autobin:
         """Calibrate target and antitarget bin sizes automatically from cohort BAMs."""
@@ -280,15 +304,15 @@ rule resolve_unit_sex:
         os.path.join(LOG_DIR, "resolve_unit_sex/{unit}.log"),
     shell:
         r"""
-        python3 -c '
+        python3 - <<'PY' &> {log}
 import sys
 from pathlib import Path
-sys.path.insert(0, "{params.rules_dir}")
+sys.path.insert(0, {params.rules_dir!r})
 from helpers import parse_cnvkit_sex
-sex = parse_cnvkit_sex("{input.sex_tsv}", "{params.sex_override}")
-Path("{output.sex_txt}").parent.mkdir(parents=True, exist_ok=True)
-Path("{output.sex_txt}").write_text(sex + "\n", encoding="utf-8")
-' &> {log}
+sex = parse_cnvkit_sex({input.sex_tsv!r}, {params.sex_override!r})
+Path({output.sex_txt!r}).parent.mkdir(parents=True, exist_ok=True)
+Path({output.sex_txt!r}).write_text(sex + "\n", encoding="utf-8")
+PY
         """
 
 
@@ -347,12 +371,12 @@ rule identify_clean_normals:
         os.path.join(LOG_DIR, "identify_clean_normals/clean_normals.log"),
     shell:
         r"""
-        python3 -c '
+        python3 - <<'PY' &> {log}
 import sys
-sys.path.insert(0, "{params.rules_dir}")
+sys.path.insert(0, {params.rules_dir!r})
 from helpers import identify_clean_normals
-identify_clean_normals("{input.metrics}", "{params.cov_dir}", "{output.clean_list}", float({params.threshold}))
-' &> {log}
+identify_clean_normals({input.metrics!r}, {params.cov_dir!r}, {output.clean_list!r}, float({params.threshold}))
+PY
         """
 
 
@@ -568,23 +592,24 @@ rule cnvkit_call:
         os.path.join(LOG_DIR, "benchmarks/cnvkit_call/{unit}.tsv")
     shell:
         r"""
-        CALL_ARGS=$(python3 -c '
+        CALL_ARGS=$(python3 - <<'PY'
 import sys
 from pathlib import Path
-sys.path.insert(0, "{params.rules_dir}")
+sys.path.insert(0, {params.rules_dir!r})
 from helpers import build_cnvkit_call_args
-sex = Path("{input.sex_txt}").read_text(encoding="utf-8").strip()
+sex = Path({input.sex_txt!r}).read_text(encoding="utf-8").strip()
 print(build_cnvkit_call_args(
-    purity_ploidy_tsv="{input.purity_ploidy}",
+    purity_ploidy_tsv={input.purity_ploidy!r},
     sex=sex,
     male_reference=bool({params.male_reference}),
-    call_method="{params.call_method}",
-    call_filter="{params.call_filter}",
+    call_method={params.call_method!r},
+    call_filter={params.call_filter!r},
     drop_low_coverage=bool({params.drop_low_coverage}),
     vcf_args={params.vcf_args!r},
     extra={params.extra!r},
 ))
-')
+PY
+)
         echo "Running: cnvkit.py call {input.cns} $CALL_ARGS -o {output.call_cns}" > {log}
         cnvkit.py call {input.cns} $CALL_ARGS -o {output.call_cns} &>> {log}
         """

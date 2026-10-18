@@ -382,7 +382,7 @@ def build_cnvkit_vcf_args(
     normal_id: str = "",
     min_variant_depth: int | None = None,
 ) -> str:
-    """Build CNVkit VCF BAF CLI flags (-v, -i, -n, -m)."""
+    """Build CNVkit VCF BAF CLI flags (-v, -i, -n, --min-variant-depth)."""
     vcf_clean = str(vcf).strip()
     if not vcf_clean or vcf_clean == ".":
         return ""
@@ -392,8 +392,32 @@ def build_cnvkit_vcf_args(
     if normal_id and str(normal_id).strip() not in ("", "."):
         parts.append(f"-n {str(normal_id).strip()}")
     if min_variant_depth is not None and int(min_variant_depth) > 0:
-        parts.append(f"-m {int(min_variant_depth)}")
+        parts.append(f"--min-variant-depth {int(min_variant_depth)}")
     return " ".join(parts)
+
+
+def extract_reference_regions(
+    reference_cnn: str | Path,
+    targets_bed: str | Path,
+    antitargets_bed: str | Path,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Extract target and antitarget BED4 intervals from a pre-built CNVkit reference .cnn."""
+    df = pd.read_csv(reference_cnn, sep="\t", dtype=str, keep_default_na=False)
+    required = {"chromosome", "start", "end", "gene"}
+    if not required.issubset(df.columns):
+        raise ValueError(f"Reference CNN {reference_cnn} must contain columns {sorted(required)}.")
+    cols = ["chromosome", "start", "end", "gene"]
+    is_bg = df["gene"].isin(("Antitarget", "Background"))
+    targets_df = df.loc[~is_bg, cols].reset_index(drop=True)
+    antitargets_df = df.loc[is_bg, cols].reset_index(drop=True)
+
+    t_path = Path(targets_bed)
+    a_path = Path(antitargets_bed)
+    t_path.parent.mkdir(parents=True, exist_ok=True)
+    a_path.parent.mkdir(parents=True, exist_ok=True)
+    targets_df.to_csv(t_path, sep="\t", header=False, index=False)
+    antitargets_df.to_csv(a_path, sep="\t", header=False, index=False)
+    return targets_df, antitargets_df
 
 
 def identify_clean_normals(
