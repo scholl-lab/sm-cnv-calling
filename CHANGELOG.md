@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Snakemake 8+ Workflow Layout & Schemas (#4)**:
   - Migrated workflow to `workflow/Snakefile`, `workflow/rules/{common,cnvkit,purecn,qc}.smk`, and `workflow/rules/helpers.py` with `min_version("8.0")`.
   - Added JSON Schemas `workflow/schemas/config.schema.yaml` and `workflow/schemas/samples.schema.yaml` with `GRCh38`/`hg38` defaults.
-  - Added pinned Bioconda environments `workflow/envs/cnvkit.yaml` (`cnvkit=0.9.12`, `bedtools=2.31.1`, `samtools=1.21`, `bcftools=1.21`, `htslib=1.21`) and `workflow/envs/purecn.yaml` (`bioconductor-purecn=2.12.0`, `bioconductor-dnacopy=1.78.0`, `r-pscbs=0.67.0`).
+  - Added pinned Bioconda environments `workflow/envs/cnvkit.yaml` (`cnvkit=0.9.14`, `bedtools=2.31.1`, `samtools=1.21`, `bcftools=1.21`, `htslib=1.21`) and `workflow/envs/purecn.yaml` (`bioconductor-purecn=2.16.1`, `r-pscbs=0.68.0`).
   - Added `scripts/generate_config.py` for automated sample sheet and config generation from `sm-alignment` BAM directories.
   - Archived legacy `scripts/snakemake` and `scripts/run_cnv_pipeline.sh` under `deprecated/`.
 - **Shared Sample Sheet & Multi-Region / 97-BAM Cohort Support (#5)**:

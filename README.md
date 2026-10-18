@@ -105,7 +105,7 @@ conda activate snakemake
 pip install snakemake-executor-plugin-slurm
 ```
 
-Per-rule tool environments (`workflow/envs/cnvkit.yaml` and `workflow/envs/purecn.yaml`) are managed automatically by Snakemake with pinned Bioconda versions (`cnvkit=0.9.12`, `bedtools=2.31.1`, `samtools=1.21`, `bcftools=1.21`, `bioconductor-purecn=2.12.0`).
+Per-rule tool environments (`workflow/envs/cnvkit.yaml` and `workflow/envs/purecn.yaml`) are managed automatically by Snakemake with pinned Bioconda versions (`cnvkit=0.9.14`, `bedtools=2.31.1`, `samtools=1.21`, `bcftools=1.21`, `bioconductor-purecn=2.16.1`).
 
 ### 2. Generate or Reuse `config/samples.tsv` and `config/config.yaml`
 

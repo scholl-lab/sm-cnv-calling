@@ -53,15 +53,22 @@ jobs:
           create-args: >-
             python=3.11
             pytest
-            pandas=2.2.3
+            pandas=2.3.3
             pyyaml=6.0.2
             jsonschema
             snakemake
-            cnvkit=0.9.12
+            cnvkit=0.9.14
             bedtools=2.31.1
             samtools=1.21
             bcftools=1.21
             htslib=1.21
+
+      - name: Solve pinned per-rule conda environments
+        shell: bash -el {0}
+        run: |
+          for f in workflow/envs/*.yaml; do
+            micromamba create -y --dry-run -n "solve-$(basename "$f" .yaml)" -f "$f"
+          done
 
       - name: Run full pytest suite
         shell: bash -el {0}
