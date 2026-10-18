@@ -1,0 +1,55 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+description: Schema for an entry in the sm-cnv-calling sample sheet (compatible with sm-calling).
+
+type: object
+properties:
+  sample:
+    type: string
+    minLength: 1
+    description: Unique sample/analysis identifier.
+  tumor_bam:
+    type: string
+    minLength: 1
+    description: "Basename(s) or path(s) of tumor/primary BAM file(s); semicolon-delimited for multi-region samples."
+  normal_bam:
+    type: string
+    default: "."
+    description: "Basename or path of matched normal BAM file. Use '.' or leave empty if none."
+  analysis_type:
+    type: string
+    enum: ["tumor_only", "tumor_normal", "germline", "TvsN", "To"]
+    description: "Type of analysis ('tumor_normal', 'tumor_only', 'germline', or legacy aliases 'TvsN', 'To')."
+  in_pon:
+    type: string
+    enum: ["yes", "no", "true", "false", "1", "0", ".", ""]
+    description: "Optional flag ('yes'/'no') controlling inclusion of normal BAM in cohort PoN."
+  vcf:
+    type: string
+    description: "Optional explicit path to somatic/germline VCF file (auto-resolved from paths.vcf_folder when omitted)."
+  vcf_stats:
+    type: string
+    description: "Optional explicit path to Mutect2 .vcf.gz.stats file."
+  germline_vcf:
+    type: string
+    description: "Optional explicit path to germline VCF file."
+  tumor_sample_id_vcf:
+    type: string
+    description: "Optional tumor sample ID(s) in the VCF header (defaults to tumor BAM basename)."
+  normal_sample_id_vcf:
+    type: string
+    description: "Optional normal sample ID in the VCF header (defaults to normal BAM basename)."
+  sex:
+    type: string
+    enum: ["M", "F", "m", "f", "male", "female", "x", "y", "X", "Y", ".", ""]
+    description: "Optional chromosomal sex override ('male'/'female' or 'M'/'F')."
+  purity:
+    type: string
+    description: "Optional explicit tumor purity estimate in (0, 1] (used when PureCN is disabled or fails)."
+  ploidy:
+    type: string
+    description: "Optional explicit tumor ploidy estimate > 0 (defaults to 2.0 when purity is set)."
+  patient_id:
+    type: string
+    description: "Optional patient identifier."
+
+required: [sample, tumor_bam, analysis_type]
