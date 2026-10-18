@@ -181,3 +181,161 @@ else:
             """
 
 
+rule cnvkit_coverage_target:
+    """Compute on-target read-depth coverage once per unique BAM."""
+    input:
+        bam=get_bam_by_basename,
+        targets=os.path.join(CNVKIT_REF_DIR, "targets.bed"),
+    output:
+        target=os.path.join(CNVKIT_COV_DIR, "{bam_basename}.targetcoverage.cnn"),
+    params:
+        extra=CNVKIT_COVERAGE_EXTRA,
+    threads: 4
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 8000 * attempt,
+        runtime=lambda wc, attempt: min(240 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_coverage_target/{bam_basename}.log"),
+    benchmark:
+        os.path.join(LOG_DIR, "benchmarks/cnvkit_coverage_target/{bam_basename}.tsv")
+    shell:
+        r"""
+        cnvkit.py coverage {input.bam} {input.targets} \
+            -p {threads} \
+            {params.extra} \
+            -o {output.target} &> {log}
+        """
+
+
+rule cnvkit_coverage_antitarget:
+    """Compute off-target read-depth coverage once per unique BAM."""
+    input:
+        bam=get_bam_by_basename,
+        antitargets=os.path.join(CNVKIT_REF_DIR, "antitargets.bed"),
+    output:
+        antitarget=os.path.join(CNVKIT_COV_DIR, "{bam_basename}.antitargetcoverage.cnn"),
+    params:
+        extra=CNVKIT_COVERAGE_EXTRA,
+    threads: 4
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 8000 * attempt,
+        runtime=lambda wc, attempt: min(240 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_coverage_antitarget/{bam_basename}.log"),
+    benchmark:
+        os.path.join(LOG_DIR, "benchmarks/cnvkit_coverage_antitarget/{bam_basename}.tsv")
+    shell:
+        r"""
+        cnvkit.py coverage {input.bam} {input.antitargets} \
+            -p {threads} \
+            {params.extra} \
+            -o {output.antitarget} &> {log}
+        """
+
+
+rule cnvkit_fix:
+    """Normalize tumor target and antitarget coverage against the PoN reference."""
+    input:
+        target=lambda wc: os.path.join(
+            CNVKIT_COV_DIR,
+            f"{get_unit_tumor_bam_basename(wc.unit)}.targetcoverage.cnn",
+        ),
+        antitarget=lambda wc: os.path.join(
+            CNVKIT_COV_DIR,
+            f"{get_unit_tumor_bam_basename(wc.unit)}.antitargetcoverage.cnn",
+        ),
+        reference=get_cnvkit_reference,
+    output:
+        cnr=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cnr"),
+    params:
+        extra=CNVKIT_FIX_EXTRA,
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(120 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_fix/{unit}.log"),
+    benchmark:
+        os.path.join(LOG_DIR, "benchmarks/cnvkit_fix/{unit}.tsv")
+    shell:
+        r"""
+        cnvkit.py fix {input.target} {input.antitarget} {input.reference} \
+            -i {wildcards.unit} \
+            {params.extra} \
+            -o {output.cnr} &> {log}
+        """
+
+
+rule cnvkit_segment:
+    """Segment normalized log2 copy ratios with optional allele-aware VCF BAF."""
+    input:
+        cnr=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cnr"),
+        vcf=get_unit_vcf_input,
+    output:
+        cns=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cns"),
+    params:
+        method=CNVKIT_SEGMENT_METHOD,
+        threshold=CNVKIT_SEGMENT_THRESHOLD,
+        drop_low_coverage_arg="--drop-low-coverage" if CNVKIT_DROP_LOW_COVERAGE else "",
+        vcf_args=get_unit_vcf_args,
+        extra=CNVKIT_SEGMENT_EXTRA,
+    threads: 4
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 8000 * attempt,
+        runtime=lambda wc, attempt: min(240 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_segment/{unit}.log"),
+    benchmark:
+        os.path.join(LOG_DIR, "benchmarks/cnvkit_segment/{unit}.tsv")
+    shell:
+        r"""
+        cnvkit.py segment {input.cnr} \
+            -m {params.method} \
+            -t {params.threshold} \
+            {params.drop_low_coverage_arg} \
+            {params.vcf_args} \
+            -p {threads} \
+            {params.extra} \
+            -o {output.cns} &> {log}
+        """
+
+
+rule cnvkit_bintest:
+    """Call focal bin-level amplifications and deletions."""
+    input:
+        cnr=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cnr"),
+        cns=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cns"),
+    output:
+        bintest_cns=os.path.join(CNVKIT_CALLS_DIR, "{unit}.bintest.cns"),
+    params:
+        extra=CNVKIT_BINTEST_EXTRA,
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(120 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_bintest/{unit}.log"),
+    benchmark:
+        os.path.join(LOG_DIR, "benchmarks/cnvkit_bintest/{unit}.tsv")
+    shell:
+        r"""
+        cnvkit.py bintest {input.cnr} \
+            -s {input.cns} \
+            {params.extra} \
+            -o {output.bintest_cns} &> {log}
+        """
+
+
