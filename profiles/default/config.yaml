@@ -1,0 +1,190 @@
+# =============================================================================
+# Workflow Profile — Resource allocation for sm-cnv-calling
+# =============================================================================
+# Loaded via --workflow-profile profiles/default
+# Override precedence: CLI > workflow profile > rule defaults > default-resources
+#
+# Note: Do NOT define default-resources here; cluster profiles (profiles/bih,
+# profiles/charite) own default-resources so slurm_account and slurm_partition
+# are not overwritten by Snakemake 8/9 profile layering.
+# =============================================================================
+
+# --- Execution settings ---
+latency-wait: 60
+jobs: 20
+rerun-incomplete: true
+retries: 2
+printshellcmds: true
+
+# --- Software deployment ---
+software-deployment-method:
+  - conda
+
+# --- Per-rule thread counts ---
+set-threads:
+  cnvkit_access: 1
+  cnvkit_filter_targets: 1
+  cnvkit_autobin: 4
+  cnvkit_target: 2
+  cnvkit_antitarget: 2
+  cnvkit_coverage_target: 4
+  cnvkit_coverage_antitarget: 4
+  cnvkit_sex: 1
+  resolve_unit_sex: 1
+  cnvkit_metrics_normals: 1
+  identify_clean_normals: 1
+  cnvkit_reference_pooled: 2
+  cnvkit_fix: 1
+  cnvkit_segment: 4
+  cnvkit_segmetrics: 2
+  cnvkit_bintest: 2
+  cnvkit_call: 2
+  cnvkit_export_seg: 1
+  cnvkit_export_bed: 1
+  cnvkit_export_vcf: 1
+  purecn_mapping_bias: 2
+  purecn_intervals: 2
+  purecn_coverage: 2
+  purecn_normaldb: 4
+  purecn_run: 8
+  consolidate_purity: 1
+  cnvkit_metrics_tumor: 1
+  cnvkit_scatter_genome: 1
+  cnvkit_scatter_gene: 1
+  cnvkit_diagram: 1
+  cnvkit_heatmap_cohort: 1
+  create_summary_report: 1
+
+# --- Per-rule resource overrides ---
+# cpus_per_task mirrors set-threads as a workaround for
+# snakemake-executor-plugin-slurm#210 (threads not mapped to --cpus-per-task).
+# All runtimes are <= 480m so BIH schedules on the fast 'short' QOS.
+set-resources:
+  cnvkit_access:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 1
+  cnvkit_filter_targets:
+    mem_mb: 4000
+    runtime: "30m"
+    cpus_per_task: 1
+  cnvkit_autobin:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 4
+  cnvkit_target:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 2
+  cnvkit_antitarget:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 2
+  cnvkit_coverage_target:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 4
+  cnvkit_coverage_antitarget:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 4
+  cnvkit_sex:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  resolve_unit_sex:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  cnvkit_metrics_normals:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 1
+  identify_clean_normals:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  cnvkit_reference_pooled:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 2
+  cnvkit_fix:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 1
+  cnvkit_segment:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 4
+  cnvkit_segmetrics:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 2
+  cnvkit_bintest:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 2
+  cnvkit_call:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 2
+  cnvkit_export_seg:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  cnvkit_export_bed:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  cnvkit_export_vcf:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  purecn_mapping_bias:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 2
+  purecn_intervals:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 2
+  purecn_coverage:
+    mem_mb: 8000
+    runtime: "120m"
+    cpus_per_task: 2
+  purecn_normaldb:
+    mem_mb: 16000
+    runtime: "120m"
+    cpus_per_task: 4
+  purecn_run:
+    mem_mb: 16000
+    runtime: "240m"
+    cpus_per_task: 8
+  consolidate_purity:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  cnvkit_metrics_tumor:
+    mem_mb: 2000
+    runtime: "30m"
+    cpus_per_task: 1
+  cnvkit_scatter_genome:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 1
+  cnvkit_scatter_gene:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 1
+  cnvkit_diagram:
+    mem_mb: 4000
+    runtime: "60m"
+    cpus_per_task: 1
+  cnvkit_heatmap_cohort:
+    mem_mb: 8000
+    runtime: "60m"
+    cpus_per_task: 1
+  create_summary_report:
+    mem_mb: 4000
+    runtime: "30m"
+    cpus_per_task: 1

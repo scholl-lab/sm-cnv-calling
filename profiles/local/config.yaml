@@ -1,0 +1,9 @@
+# =============================================================================
+# Local execution profile (no SLURM cluster)
+# =============================================================================
+# Loaded via --profile profiles/local (auto-detected by scripts/run_snakemake.sh).
+# =============================================================================
+
+jobs: 4
+software-deployment-method:
+  - conda
