@@ -451,3 +451,175 @@ def identify_clean_normals(
     return resolved_paths
 
 
+def parse_cnvkit_sex(sex_file: str | Path = "", sample_sex_override: str = "") -> str:
+    """Resolve chromosomal sex ('male' or 'female') from override or cnvkit sex output."""
+    override = normalize_sex(sample_sex_override)
+    if override:
+        return override
+
+    if sex_file and Path(sex_file).is_file() and Path(sex_file).stat().st_size > 0:
+        try:
+            df = pd.read_csv(sex_file, sep="\t")
+            if not df.empty and "sex" in df.columns:
+                inferred = normalize_sex(str(df.iloc[0]["sex"]))
+                if inferred:
+                    return inferred
+        except Exception:
+            pass
+    return "female"
+
+
+def consolidate_purity_ploidy(
+    unit: str,
+    sample: str,
+    output_file: str | Path,
+    purecn_csv: str | Path = "",
+    purecn_status_file: str | Path = "",
+    sample_purity: float | str | None = None,
+    sample_ploidy: float | str | None = None,
+    purecn_attempted: bool = False,
+) -> dict[str, Any]:
+    """Consolidate tumor purity and ploidy from PureCN or explicit sample metadata.
+
+    Never fabricates a placeholder purity: when neither PureCN nor explicit sample
+    metadata provides a valid purity, records source='unestimated' so cnvkit call
+    falls back to threshold mode.
+    """
+    purity_val: float | None = None
+    ploidy_val: float | None = None
+    source = "unestimated"
+    status = "attempted" if purecn_attempted else "skipped"
+
+    if purecn_status_file and Path(purecn_status_file).is_file():
+        raw_status = Path(purecn_status_file).read_text(encoding="utf-8").strip().lower()
+        if raw_status in ("succeeded", "failed", "skipped"):
+            status = raw_status
+
+    if purecn_csv and Path(purecn_csv).is_file() and Path(purecn_csv).stat().st_size > 0:
+        try:
+            df = pd.read_csv(purecn_csv)
+            if not df.empty and "Purity" in df.columns:
+                p_top = float(df.iloc[0]["Purity"])
+                pl_top = (
+                    float(df.iloc[0]["Ploidy"])
+                    if "Ploidy" in df.columns and pd.notna(df.iloc[0]["Ploidy"])
+                    else 2.0
+                )
+                if pd.notna(p_top) and 0.0 < p_top <= 1.0 and pl_top > 0.0:
+                    purity_val = round(p_top, 4)
+                    ploidy_val = round(pl_top, 4)
+                    source = "PureCN"
+                    status = "succeeded"
+                else:
+                    status = "failed"
+            else:
+                status = "failed"
+        except Exception:
+            status = "failed"
+    elif purecn_attempted:
+        status = "failed"
+
+    if purity_val is None and sample_purity is not None:
+        raw_p = str(sample_purity).strip()
+        if raw_p and raw_p not in ("", ".", "None", "nan"):
+            p_float = float(raw_p)
+            if not (0.0 < p_float <= 1.0):
+                raise ValueError(f"Invalid explicit sample purity: {p_float}")
+            pl_float = 2.0
+            if sample_ploidy is not None:
+                raw_pl = str(sample_ploidy).strip()
+                if raw_pl and raw_pl not in ("", ".", "None", "nan"):
+                    pl_float = float(raw_pl)
+                    if pl_float <= 0.0:
+                        raise ValueError(f"Invalid explicit sample ploidy: {pl_float}")
+            purity_val = round(p_float, 4)
+            ploidy_val = round(pl_float, 4)
+            source = "sample_sheet"
+
+    record = {
+        "unit": unit,
+        "sample": sample,
+        "purity": "" if purity_val is None else purity_val,
+        "ploidy": "" if ploidy_val is None else ploidy_val,
+        "source": source,
+        "status": status,
+    }
+    out_path = Path(output_file)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame([record]).to_csv(out_path, sep="\t", index=False)
+    return record
+
+
+def build_cnvkit_call_args(
+    purity_ploidy_tsv: str | Path,
+    sex: str = "",
+    male_reference: bool = False,
+    call_method: str = "clonal",
+    call_filter: str = "ci",
+    drop_low_coverage: bool = True,
+    vcf_args: str = "",
+    extra: str = "",
+) -> str:
+    """Build CLI flags for cnvkit.py call from consolidated purity/ploidy and sex."""
+    df = pd.read_csv(purity_ploidy_tsv, sep="\t", dtype=str, keep_default_na=False)
+    row = df.iloc[0] if not df.empty else {}
+    purity_str = str(row.get("purity", "")).strip()
+    ploidy_str = str(row.get("ploidy", "")).strip()
+    source = str(row.get("source", "unestimated")).strip()
+
+    args: list[str] = []
+    if call_filter and call_filter != "none":
+        args.append(f"--filter {call_filter}")
+    if drop_low_coverage:
+        args.append("--drop-low-coverage")
+
+    if (
+        call_method == "clonal"
+        and source in ("PureCN", "sample_sheet")
+        and purity_str not in ("", ".")
+    ):
+        args.append("-m clonal")
+        args.append(f"--purity {purity_str}")
+        if ploidy_str not in ("", "."):
+            args.append(f"--ploidy {round(float(ploidy_str))}")
+    elif call_method == "none":
+        args.append("-m none")
+    else:
+        args.append("-m threshold")
+
+    if male_reference:
+        args.append("-y")
+    norm_sex = normalize_sex(sex)
+    if norm_sex:
+        args.append(f"-x {norm_sex}")
+    if vcf_args:
+        args.append(vcf_args.strip())
+    if extra and extra.strip():
+        args.append(extra.strip())
+    return " ".join(args)
+
+
+def build_pipeline_summary(
+    units_meta: dict[str, dict[str, Any]],
+    purity_files: list[str],
+    sex_files: list[str],
+    tumor_metrics_files: list[str],
+    normal_metrics_file: str | None,
+    clean_normals_file: str | None,
+    output_summary_tsv: str | Path,
+    output_normal_qc_tsv: str | Path,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Create cohort pipeline_summary.tsv and normal_qc_summary.tsv reports."""
+    purity_map: dict[str, dict[str, str]] = {}
+    for pf in purity_files:
+        if Path(pf).is_file() and Path(pf).stat().st_size > 0:
+            pdf = pd.read_csv(pf, sep="\t", dtype=str, keep_default_na=False)
+            for _, r in pdf.iterrows():
+                purity_map[str(r["unit"])] = {
+                    "purity": str(r.get("purity", "")),
+                    "ploidy": str(r.get("ploidy", "")),
+                    "purity_source": str(r.get("source", "unestimated")),
+                    "purecn_status": str(r.get("status", "skipped")),
+                }
+
+    sex_map: dict[str, str] = {}

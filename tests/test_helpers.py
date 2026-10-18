@@ -332,3 +332,94 @@ class TestNormalPoNFiltering:
 class TestPureCNConsolidationAndCallArgs:
     """Tests for Issue #7 & #8: purity/ploidy consolidation, sex inference, and cnvkit call flags."""
 
+    def test_consolidate_purity_ploidy_from_purecn_csv(self, tmp_path: Path) -> None:
+        """Valid PureCN CSV extracts top-ranked Purity and Ploidy."""
+        csv_file = tmp_path / "PAT1.csv"
+        pd.DataFrame(
+            [{"Sampleid": "PAT1", "Purity": 0.64, "Ploidy": 3.12, "Flagged": False}]
+        ).to_csv(csv_file, index=False)
+        status_file = tmp_path / "PAT1.status"
+        status_file.write_text("succeeded\n", encoding="utf-8")
+        out_tsv = tmp_path / "PAT1.purity_ploidy.tsv"
+
+        rec = consolidate_purity_ploidy(
+            unit="PAT1",
+            sample="PAT1",
+            purecn_csv=csv_file,
+            purecn_status_file=status_file,
+            sample_purity="",
+            sample_ploidy="",
+            output_file=out_tsv,
+            purecn_attempted=True,
+        )
+        assert rec["purity"] == 0.64
+        assert rec["ploidy"] == 3.12
+        assert rec["source"] == "PureCN"
+        assert rec["status"] == "succeeded"
+
+        call_args = build_cnvkit_call_args(
+            out_tsv,
+            sex="female",
+            male_reference=True,
+            call_method="clonal",
+            call_filter="ci",
+            vcf_args="-v pat1.vcf.gz -i T1 -n N1",
+        )
+        assert "--filter ci" in call_args
+        assert "-m clonal --purity 0.64 --ploidy 3" in call_args
+        assert "-y" in call_args
+        assert "-x female" in call_args
+        assert "-v pat1.vcf.gz -i T1 -n N1" in call_args
+
+    def test_consolidate_purity_fallback_to_threshold_when_unestimated(
+        self, tmp_path: Path
+    ) -> None:
+        """When PureCN fails and no sample_sheet purity is given, cnvkit call falls back to -m threshold."""
+        csv_file = tmp_path / "PAT_FAIL.csv"
+        csv_file.write_text("", encoding="utf-8")
+        status_file = tmp_path / "PAT_FAIL.status"
+        status_file.write_text("failed\n", encoding="utf-8")
+        out_tsv = tmp_path / "PAT_FAIL.purity_ploidy.tsv"
+
+        rec = consolidate_purity_ploidy(
+            unit="PAT_FAIL",
+            sample="PAT_FAIL",
+            purecn_csv=csv_file,
+            purecn_status_file=status_file,
+            sample_purity="",
+            sample_ploidy="",
+            output_file=out_tsv,
+            purecn_attempted=True,
+        )
+        assert rec["purity"] == ""
+        assert rec["ploidy"] == ""
+        assert rec["source"] == "unestimated"
+        assert rec["status"] == "failed"
+
+        call_args = build_cnvkit_call_args(
+            out_tsv,
+            sex="male",
+            male_reference=False,
+            call_method="clonal",
+            call_filter="ci",
+        )
+        assert "-m threshold" in call_args
+        assert "--purity" not in call_args
+        assert "-x male" in call_args
+
+    def test_sex_parsing_and_resolution(self, tmp_path: Path) -> None:
+        """parse_cnvkit_sex handles sample sheet overrides and cnvkit sex TSV output."""
+        assert normalize_sex("F") == "female"
+        assert normalize_sex("M") == "male"
+        with pytest.raises(ValueError, match="Invalid sex"):
+            normalize_sex("unknown_sex")
+
+        sex_out = "sample\tsex\tchrX_ratio\tchrY_ratio\nT1.cnr\tMale\t-0.95\t-0.10\n"
+        inferred_file = tmp_path / "T1.sex.tsv"
+        inferred_file.write_text(sex_out, encoding="utf-8")
+        assert parse_cnvkit_sex(inferred_file, "") == "male"
+        assert parse_cnvkit_sex(inferred_file, "female") == "female"
+
+
+class TestSummaryReportAndConfigGenerator:
+    """Tests for pipeline summary generation and scripts/generate_config.py."""
