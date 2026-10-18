@@ -239,6 +239,59 @@ rule cnvkit_coverage_antitarget:
         """
 
 
+rule cnvkit_sex:
+    """Infer chromosomal sex from target and antitarget coverage per BAM."""
+    input:
+        target=os.path.join(CNVKIT_COV_DIR, "{bam_basename}.targetcoverage.cnn"),
+        antitarget=os.path.join(CNVKIT_COV_DIR, "{bam_basename}.antitargetcoverage.cnn"),
+    output:
+        sex_tsv=os.path.join(CNVKIT_COV_DIR, "{bam_basename}.sex.tsv"),
+    params:
+        male_ref_arg="-y" if CNVKIT_MALE_REFERENCE else "",
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(60 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_sex/{bam_basename}.log"),
+    shell:
+        r"""
+        cnvkit.py sex {input.target} {input.antitarget} \
+            {params.male_ref_arg} \
+            -o {output.sex_tsv} &> {log}
+        """
+
+
+rule resolve_unit_sex:
+    """Resolve chromosomal sex for a CNV unit (sample sheet override or cnvkit sex)."""
+    localrule: True
+    input:
+        sex_tsv=lambda wc: os.path.join(
+            CNVKIT_COV_DIR, f"{get_unit_tumor_bam_basename(wc.unit)}.sex.tsv"
+        ),
+    output:
+        sex_txt=os.path.join(CNVKIT_CALLS_DIR, "{unit}.sex.txt"),
+    params:
+        sex_override=lambda wc: CNV_UNITS[wc.unit]["sex"],
+        rules_dir=RULES_DIR,
+    log:
+        os.path.join(LOG_DIR, "resolve_unit_sex/{unit}.log"),
+    shell:
+        r"""
+        python3 -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, "{params.rules_dir}")
+from helpers import parse_cnvkit_sex
+sex = parse_cnvkit_sex("{input.sex_tsv}", "{params.sex_override}")
+Path("{output.sex_txt}").parent.mkdir(parents=True, exist_ok=True)
+Path("{output.sex_txt}").write_text(sex + "\n", encoding="utf-8")
+' &> {log}
+        """
+
+
 rule cnvkit_metrics_normals:
     """Compute noise metrics across candidate PoN normal target coverages."""
     input:
@@ -429,6 +482,35 @@ rule cnvkit_segment:
         """
 
 
+rule cnvkit_segmetrics:
+    """Compute segment-level confidence intervals and dispersion statistics."""
+    input:
+        cnr=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cnr"),
+        cns=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cns"),
+    output:
+        segmetrics_cns=os.path.join(CNVKIT_RUNS_DIR, "{unit}.segmetrics.cns"),
+    params:
+        extra=CNVKIT_SEGMETRICS_EXTRA,
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(120 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_segmetrics/{unit}.log"),
+    benchmark:
+        os.path.join(LOG_DIR, "benchmarks/cnvkit_segmetrics/{unit}.tsv")
+    shell:
+        r"""
+        cnvkit.py segmetrics {input.cnr} \
+            -s {input.cns} \
+            --ci --pi --sem --iqr \
+            {params.extra} \
+            -o {output.segmetrics_cns} &> {log}
+        """
+
+
 rule cnvkit_bintest:
     """Call focal bin-level amplifications and deletions."""
     input:
@@ -457,3 +539,131 @@ rule cnvkit_bintest:
         """
 
 
+rule cnvkit_call:
+    """Call integer copy numbers and allele-specific CN using purity, ploidy, sex, and BAF."""
+    input:
+        cns=os.path.join(CNVKIT_RUNS_DIR, "{unit}.segmetrics.cns"),
+        purity_ploidy=os.path.join(PURITY_DIR, "{unit}.purity_ploidy.tsv"),
+        sex_txt=os.path.join(CNVKIT_CALLS_DIR, "{unit}.sex.txt"),
+        vcf=get_unit_vcf_input,
+    output:
+        call_cns=os.path.join(CNVKIT_CALLS_DIR, "{unit}.call.cns"),
+    params:
+        male_reference=CNVKIT_MALE_REFERENCE,
+        call_method=CNVKIT_CALL_METHOD,
+        call_filter=CNVKIT_CALL_FILTER,
+        drop_low_coverage=CNVKIT_DROP_LOW_COVERAGE,
+        vcf_args=get_unit_vcf_args,
+        extra=CNVKIT_CALL_EXTRA,
+        rules_dir=RULES_DIR,
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 8000 * attempt,
+        runtime=lambda wc, attempt: min(120 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_call/{unit}.log"),
+    benchmark:
+        os.path.join(LOG_DIR, "benchmarks/cnvkit_call/{unit}.tsv")
+    shell:
+        r"""
+        CALL_ARGS=$(python3 -c '
+import sys
+from pathlib import Path
+sys.path.insert(0, "{params.rules_dir}")
+from helpers import build_cnvkit_call_args
+sex = Path("{input.sex_txt}").read_text(encoding="utf-8").strip()
+print(build_cnvkit_call_args(
+    purity_ploidy_tsv="{input.purity_ploidy}",
+    sex=sex,
+    male_reference=bool({params.male_reference}),
+    call_method="{params.call_method}",
+    call_filter="{params.call_filter}",
+    drop_low_coverage=bool({params.drop_low_coverage}),
+    vcf_args={params.vcf_args!r},
+    extra={params.extra!r},
+))
+')
+        echo "Running: cnvkit.py call {input.cns} $CALL_ARGS -o {output.call_cns}" > {log}
+        cnvkit.py call {input.cns} $CALL_ARGS -o {output.call_cns} &>> {log}
+        """
+
+
+rule cnvkit_export_seg:
+    """Export segmentation in DNAcopy SEG format for PureCN, IGV, and GISTIC2."""
+    input:
+        cns=os.path.join(CNVKIT_RUNS_DIR, "{unit}.cns"),
+    output:
+        seg=os.path.join(CNVKIT_EXPORTS_DIR, "{unit}.seg"),
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(60 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_export_seg/{unit}.log"),
+    shell:
+        r"""
+        cnvkit.py export seg {input.cns} -o {output.seg} &> {log}
+        """
+
+
+rule cnvkit_export_bed:
+    """Export non-neutral integer copy-number segments in BED format."""
+    input:
+        call_cns=os.path.join(CNVKIT_CALLS_DIR, "{unit}.call.cns"),
+        sex_txt=os.path.join(CNVKIT_CALLS_DIR, "{unit}.sex.txt"),
+    output:
+        bed=os.path.join(CNVKIT_EXPORTS_DIR, "{unit}.cnv.bed"),
+    params:
+        male_ref_arg="-y" if CNVKIT_MALE_REFERENCE else "",
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(60 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_export_bed/{unit}.log"),
+    shell:
+        r"""
+        SAMPLE_SEX=$(cat {input.sex_txt})
+        cnvkit.py export bed {input.call_cns} \
+            --show variant \
+            -i {wildcards.unit} \
+            {params.male_ref_arg} \
+            -x "$SAMPLE_SEX" \
+            -o {output.bed} &> {log}
+        """
+
+
+rule cnvkit_export_vcf:
+    """Export final copy-number calls as bgzipped and tabix-indexed VCF."""
+    input:
+        call_cns=os.path.join(CNVKIT_CALLS_DIR, "{unit}.call.cns"),
+        sex_txt=os.path.join(CNVKIT_CALLS_DIR, "{unit}.sex.txt"),
+    output:
+        vcf=os.path.join(CNVKIT_EXPORTS_DIR, "{unit}.cnv.vcf.gz"),
+        tbi=os.path.join(CNVKIT_EXPORTS_DIR, "{unit}.cnv.vcf.gz.tbi"),
+    params:
+        male_ref_arg="-y" if CNVKIT_MALE_REFERENCE else "",
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(60 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_export_vcf/{unit}.log"),
+    shell:
+        r"""
+        SAMPLE_SEX=$(cat {input.sex_txt})
+        cnvkit.py export vcf {input.call_cns} \
+            -i {wildcards.unit} \
+            {params.male_ref_arg} \
+            -x "$SAMPLE_SEX" \
+            2> {log} | bgzip -c > {output.vcf} 2>> {log}
+        tabix -p vcf {output.vcf} &>> {log}
+        """

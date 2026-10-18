@@ -623,3 +623,115 @@ def build_pipeline_summary(
                 }
 
     sex_map: dict[str, str] = {}
+    for sf in sex_files:
+        p = Path(sf)
+        if p.is_file():
+            unit_key = p.name.replace(".sex.txt", "")
+            sex_map[unit_key] = p.read_text(encoding="utf-8").strip()
+
+    metrics_map: dict[str, dict[str, Any]] = {}
+    for mf in tumor_metrics_files:
+        p = Path(mf)
+        if p.is_file() and p.stat().st_size > 0:
+            unit_key = p.name.replace(".metrics.tsv", "")
+            try:
+                mdf = pd.read_csv(p, sep="\t")
+                if not mdf.empty:
+                    r0 = mdf.iloc[0]
+                    metrics_map[unit_key] = {
+                        "segments": r0.get("segments", ""),
+                        "stdev": r0.get("stdev", ""),
+                        "mad": r0.get("mad", ""),
+                        "iqr": r0.get("iqr", ""),
+                        "bivar": r0.get("bivar", ""),
+                    }
+            except Exception:
+                pass
+
+    summary_rows: list[dict[str, Any]] = []
+    for unit_id, meta in units_meta.items():
+        pinfo = purity_map.get(unit_id, {})
+        minfo = metrics_map.get(unit_id, {})
+        summary_rows.append(
+            {
+                "unit": unit_id,
+                "sample": meta["sample"],
+                "analysis_type": meta["analysis_type"],
+                "tumor_bam": meta["tumor_bam"],
+                "normal_bam": meta["normal_bam"],
+                "sex": sex_map.get(unit_id, meta.get("sex", "")),
+                "purity": pinfo.get("purity", ""),
+                "ploidy": pinfo.get("ploidy", ""),
+                "purity_source": pinfo.get("purity_source", "unestimated"),
+                "purecn_status": pinfo.get("purecn_status", "skipped"),
+                "segments": minfo.get("segments", ""),
+                "stdev": minfo.get("stdev", ""),
+                "mad": minfo.get("mad", ""),
+                "iqr": minfo.get("iqr", ""),
+                "bivar": minfo.get("bivar", ""),
+            }
+        )
+
+    summary_cols = [
+        "unit",
+        "sample",
+        "analysis_type",
+        "tumor_bam",
+        "normal_bam",
+        "sex",
+        "purity",
+        "ploidy",
+        "purity_source",
+        "purecn_status",
+        "segments",
+        "stdev",
+        "mad",
+        "iqr",
+        "bivar",
+    ]
+    summary_df = pd.DataFrame(summary_rows, columns=summary_cols)
+    out_sum = Path(output_summary_tsv)
+    out_sum.parent.mkdir(parents=True, exist_ok=True)
+    summary_df.to_csv(out_sum, sep="\t", index=False)
+
+    clean_set: set[str] = set()
+    if clean_normals_file and Path(clean_normals_file).is_file():
+        for line in Path(clean_normals_file).read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.endswith(".targetcoverage.cnn"):
+                clean_set.add(os.path.basename(line)[: -len(".targetcoverage.cnn")])
+
+    normal_rows: list[dict[str, Any]] = []
+    if (
+        normal_metrics_file
+        and Path(normal_metrics_file).is_file()
+        and Path(normal_metrics_file).stat().st_size > 0
+    ):
+        try:
+            ndf = pd.read_csv(normal_metrics_file, sep="\t")
+            for _, nrow in ndf.iterrows():
+                raw_s = os.path.basename(str(nrow.get("sample", "")).strip())
+                for sfx in (".targetcoverage.cnn", ".antitargetcoverage.cnn", ".cnn"):
+                    if raw_s.endswith(sfx):
+                        raw_s = raw_s[: -len(sfx)]
+                        break
+                normal_rows.append(
+                    {
+                        "normal_bam": raw_s,
+                        "stdev": nrow.get("stdev", ""),
+                        "mad": nrow.get("mad", ""),
+                        "iqr": nrow.get("iqr", ""),
+                        "bivar": nrow.get("bivar", ""),
+                        "included_in_pon": raw_s in clean_set,
+                    }
+                )
+        except Exception:
+            pass
+
+    normal_cols = ["normal_bam", "stdev", "mad", "iqr", "bivar", "included_in_pon"]
+    normal_df = pd.DataFrame(normal_rows, columns=normal_cols)
+    out_norm = Path(output_normal_qc_tsv)
+    out_norm.parent.mkdir(parents=True, exist_ok=True)
+    normal_df.to_csv(out_norm, sep="\t", index=False)
+
+    return summary_df, normal_df

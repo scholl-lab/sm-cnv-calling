@@ -423,3 +423,108 @@ class TestPureCNConsolidationAndCallArgs:
 
 class TestSummaryReportAndConfigGenerator:
     """Tests for pipeline summary generation and scripts/generate_config.py."""
+
+    def test_build_pipeline_summary(self, tmp_path: Path) -> None:
+        """build_pipeline_summary aggregates purity, sex, tumor metrics, and normal QC."""
+        units_meta = {
+            "PAT1": {
+                "sample": "PAT1",
+                "analysis_type": "tumor_normal",
+                "tumor_bam": "T1",
+                "normal_bam": "N1",
+                "sex": "female",
+            }
+        }
+        purity_tsv = tmp_path / "PAT1.purity_ploidy.tsv"
+        pd.DataFrame(
+            [
+                {
+                    "unit": "PAT1",
+                    "sample": "PAT1",
+                    "purity": 0.55,
+                    "ploidy": 2.0,
+                    "source": "PureCN",
+                    "status": "succeeded",
+                }
+            ]
+        ).to_csv(purity_tsv, sep="\t", index=False)
+
+        sex_txt = tmp_path / "PAT1.sex.txt"
+        sex_txt.write_text("female\n", encoding="utf-8")
+
+        t_metrics = tmp_path / "PAT1.metrics.tsv"
+        pd.DataFrame(
+            [
+                {
+                    "sample": "PAT1",
+                    "segments": 42,
+                    "stdev": 0.15,
+                    "mad": 0.11,
+                    "iqr": 0.14,
+                    "bivar": 0.12,
+                }
+            ]
+        ).to_csv(t_metrics, sep="\t", index=False)
+
+        n_metrics = tmp_path / "normals_metrics.tsv"
+        pd.DataFrame(
+            [
+                {
+                    "sample": "N1.targetcoverage.cnn",
+                    "stdev": 0.1,
+                    "mad": 0.08,
+                    "iqr": 0.09,
+                    "bivar": 0.09,
+                }
+            ]
+        ).to_csv(n_metrics, sep="\t", index=False)
+
+        clean_normals = tmp_path / "clean_normals.txt"
+        clean_normals.write_text(
+            "/cov/N1.targetcoverage.cnn\n/cov/N1.antitargetcoverage.cnn\n",
+            encoding="utf-8",
+        )
+
+        out_summary = tmp_path / "pipeline_summary.tsv"
+        out_norm_qc = tmp_path / "normal_qc_summary.tsv"
+
+        sum_df, norm_df = build_pipeline_summary(
+            units_meta=units_meta,
+            purity_files=[str(purity_tsv)],
+            sex_files=[str(sex_txt)],
+            tumor_metrics_files=[str(t_metrics)],
+            normal_metrics_file=str(n_metrics),
+            clean_normals_file=str(clean_normals),
+            output_summary_tsv=out_summary,
+            output_normal_qc_tsv=out_norm_qc,
+        )
+        assert len(sum_df) == 1
+        assert sum_df.iloc[0]["purity"] == "0.55"
+        assert sum_df.iloc[0]["segments"] == 42
+        assert len(norm_df) == 1
+        assert bool(norm_df.iloc[0]["included_in_pon"]) is True
+
+    def test_generate_config_builders(self, tmp_path: Path) -> None:
+        """discover_bam_files, build_sample_rows, and render_config_yaml produce valid GRCh38 structures."""
+        bam_dir = tmp_path / "bams"
+        bam_dir.mkdir()
+        for b in ("PAT1_T.merged.dedup.bqsr.bam", "PAT1_N.merged.dedup.bqsr.bam"):
+            (bam_dir / b).write_bytes(b"BAM")
+
+        entries = discover_bam_files(bam_dir, ".merged.dedup.bqsr.bam")
+        rows = build_sample_rows(entries)
+        assert len(rows) == 1
+        assert rows[0]["tumor_bam"] == "PAT1_T"
+        assert rows[0]["normal_bam"] == "PAT1_N"
+        assert rows[0]["analysis_type"] == "tumor_normal"
+
+        cfg = yaml.safe_load(
+            render_config_yaml(
+                samples_path="config/samples.tsv",
+                bam_folder=str(bam_dir),
+                vcf_folder="",
+                output_folder="results",
+            )
+        )
+        assert cfg["ref"]["build"] == "GRCh38"
+        assert cfg["purecn"]["genome"] == "hg38"
