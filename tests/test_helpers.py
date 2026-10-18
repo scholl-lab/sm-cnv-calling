@@ -208,3 +208,72 @@ class TestSampleSheetAndBamResolution:
             == "-v pat1.vcf.gz -i T1 -n N1 -m 20"
         )
         assert build_cnvkit_vcf_args("to1.vcf.gz", "TO1", "", 15) == "-v to1.vcf.gz -i TO1 -m 15"
+
+
+class TestBedtoolsBlacklistSubtraction:
+    """Tests for Issue #1: real bedtools subtract execution on target and access BEDs."""
+
+    def test_bedtools_subtract_excises_blacklist_intervals(self, tmp_path: Path) -> None:
+        """Run real bedtools subtract on targets.bed and blacklist.bed."""
+        bedtools = require_tool("bedtools")
+        targets = tmp_path / "targets.bed"
+        blacklist = tmp_path / "blacklist.bed"
+        clean = tmp_path / "targets.clean.bed"
+
+        targets.write_text(
+            "chr1\t100\t300\tEXON1\nchr1\t500\t700\tEXON2\n",
+            encoding="utf-8",
+        )
+        blacklist.write_text("chr1\t250\t350\n", encoding="utf-8")
+
+        res = subprocess.run(
+            [bedtools, "subtract", "-a", str(targets), "-b", str(blacklist)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        clean.write_text(res.stdout, encoding="utf-8")
+        lines = [line.strip() for line in clean.read_text(encoding="utf-8").splitlines() if line]
+        assert lines == [
+            "chr1\t100\t250\tEXON1",
+            "chr1\t500\t700\tEXON2",
+        ]
+
+    def test_samtools_bgzip_tabix_bcftools_execution(self, tmp_path: Path) -> None:
+        """Run real samtools faidx, bgzip, tabix -p vcf, and bcftools view on synthetic CNV VCF."""
+        samtools = require_tool("samtools")
+        bgzip = require_tool("bgzip")
+        tabix = require_tool("tabix")
+        bcftools = require_tool("bcftools")
+
+        fasta = tmp_path / "ref.fa"
+        fasta.write_text(">chr1\n" + ("ACGT" * 50) + "\n", encoding="utf-8")
+        subprocess.run([samtools, "faidx", str(fasta)], check=True, capture_output=True)
+        assert (tmp_path / "ref.fa.fai").is_file()
+
+        raw_vcf = tmp_path / "sample.cnv.vcf"
+        raw_vcf.write_text(
+            "##fileformat=VCFv4.2\n"
+            "##contig=<ID=chr1,length=200>\n"
+            '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n'
+            '##INFO=<ID=END,Number=1,Type=Integer,Description="End position">\n'
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tPAT1\n"
+            "chr1\t10\t.\tN\t<DUP>\t.\tPASS\tSVTYPE=DUP;END=150\tGT\t0/1\n",
+            encoding="utf-8",
+        )
+        vcf_gz = tmp_path / "sample.cnv.vcf.gz"
+        with vcf_gz.open("wb") as out_fh:
+            subprocess.run([bgzip, "-c", str(raw_vcf)], check=True, stdout=out_fh)
+        subprocess.run([tabix, "-p", "vcf", str(vcf_gz)], check=True, capture_output=True)
+        assert (tmp_path / "sample.cnv.vcf.gz.tbi").is_file()
+
+        view_res = subprocess.run(
+            [bcftools, "view", "-H", str(vcf_gz), "chr1:1-200"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert "SVTYPE=DUP;END=150" in view_res.stdout
+
+
