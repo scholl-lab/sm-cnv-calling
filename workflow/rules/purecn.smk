@@ -197,7 +197,7 @@ if PURECN_ENABLED:
             intervals=_purecn_run_intervals_input,
             normaldb=_purecn_run_normaldb_input,
             mapping_bias=_purecn_run_mapping_bias_input,
-            vcf=lambda wc: get_unit_vcf_path(wc.unit),
+            vcf=lambda wc: get_unit_purecn_vcf_path(wc.unit),
             stats=_purecn_run_stats_input,
             snp_blacklist=[PURECN_SNP_BLACKLIST] if PURECN_SNP_BLACKLIST else [],
         output:

@@ -30,7 +30,9 @@ from workflow.rules.helpers import (
     normalize_analysis_type,
     normalize_sex,
     parse_cnvkit_sex,
+    resolve_baf_vcf,
     resolve_bam_path,
+    resolve_purecn_vcf,
     resolve_sample_vcf,
     resolve_sample_vcf_stats,
     strip_bam_extension,
@@ -180,26 +182,68 @@ class TestSampleSheetAndBamResolution:
         with pytest.raises(ValueError, match="missing normal_bam"):
             validate_samples_df(missing_normal_df)
 
-    def test_vcf_and_stats_resolution(self, minimal_workspace: dict[str, Any]) -> None:
-        """VCF and Mutect2 .vcf.gz.stats resolve from paths.vcf_folder or explicit columns."""
+    def test_vcf_and_stats_resolution(
+        self, minimal_workspace: dict[str, Any], caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """resolve_baf_vcf and resolve_purecn_vcf handle germline-only, mutect2-only, and both (#13)."""
+        import logging
+
         df = minimal_workspace["samples_df"]
         vcf_dir = str(minimal_workspace["vcf_dir"])
-        assert resolve_sample_vcf(df, "PAT1", vcf_dir).endswith(
-            "mutect2/filtered/PAT1.filtered.vcf.gz"
-        )
+        expected_folder_mutect2 = f"{vcf_dir}/mutect2/filtered/PAT1.filtered.vcf.gz"
+
+        # 1. Mutect2 only (via vcf_folder)
+        assert resolve_baf_vcf(df, "PAT1", vcf_dir) == expected_folder_mutect2
+        assert resolve_purecn_vcf(df, "PAT1", vcf_dir) == expected_folder_mutect2
+        assert resolve_sample_vcf(df, "PAT1", vcf_dir) == expected_folder_mutect2
         assert resolve_sample_vcf_stats(df, "PAT1", vcf_dir).endswith(
             "mutect2/merged/PAT1.vcf.gz.stats"
         )
-        assert resolve_sample_vcf(df, "PAT1", "") == ""
 
-        # Explicit VCF column overrides vcf_folder
-        df_explicit = df.copy()
-        df_explicit["vcf"] = ["/custom/PAT1.vcf.gz", "", "", ""]
-        df_explicit["vcf_stats"] = ["/custom/PAT1.vcf.gz.stats", "", "", ""]
-        assert resolve_sample_vcf(df_explicit, "PAT1", vcf_dir) == "/custom/PAT1.vcf.gz"
+        # Neither set -> both return "" and PureCN logs skip reason
+        with caplog.at_level(logging.INFO):
+            assert resolve_baf_vcf(df, "PAT1", "") == ""
+            assert resolve_purecn_vcf(df, "PAT1", "") == ""
+        assert "Skipping PureCN for sample 'PAT1'" in caplog.text
+
+        # 2. Mutect2 only (via explicit 'vcf' column)
+        df_mutect2_only = df.copy()
+        df_mutect2_only["vcf"] = ["/custom/PAT1.mutect2.vcf.gz", "", "", ""]
+        df_mutect2_only["germline_vcf"] = ["", "", "", ""]
+        df_mutect2_only["vcf_stats"] = ["/custom/PAT1.vcf.gz.stats", "", "", ""]
+        assert resolve_baf_vcf(df_mutect2_only, "PAT1", vcf_dir) == "/custom/PAT1.mutect2.vcf.gz"
         assert (
-            resolve_sample_vcf_stats(df_explicit, "PAT1", vcf_dir) == "/custom/PAT1.vcf.gz.stats"
+            resolve_purecn_vcf(df_mutect2_only, "PAT1", vcf_dir) == "/custom/PAT1.mutect2.vcf.gz"
         )
+        assert (
+            resolve_sample_vcf_stats(df_mutect2_only, "PAT1", vcf_dir)
+            == "/custom/PAT1.vcf.gz.stats"
+        )
+
+        # 3. Germline only (germline_vcf set, no Mutect2 vcf column or vcf_folder)
+        df_germline_only = df.copy()
+        df_germline_only["vcf"] = ["", "", "", ""]
+        df_germline_only["germline_vcf"] = ["/germline/PAT1.freebayes.vcf.gz", "", "", ""]
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            assert (
+                resolve_baf_vcf(df_germline_only, "PAT1", "") == "/germline/PAT1.freebayes.vcf.gz"
+            )
+            assert resolve_purecn_vcf(df_germline_only, "PAT1", "") == ""
+        assert "germline_vcf='/germline/PAT1.freebayes.vcf.gz' is set" in caplog.text
+
+        # 4. Both set: germline_vcf + vcf_folder -> CNVkit gets germline_vcf, PureCN gets vcf_folder Mutect2
+        assert (
+            resolve_baf_vcf(df_germline_only, "PAT1", vcf_dir) == "/germline/PAT1.freebayes.vcf.gz"
+        )
+        assert resolve_purecn_vcf(df_germline_only, "PAT1", vcf_dir) == expected_folder_mutect2
+
+        # 5. Both set: germline_vcf + explicit 'vcf' column -> CNVkit gets germline_vcf, PureCN gets 'vcf'
+        df_both = df.copy()
+        df_both["vcf"] = ["/custom/PAT1.mutect2.vcf.gz", "", "", ""]
+        df_both["germline_vcf"] = ["/germline/PAT1.freebayes.vcf.gz", "", "", ""]
+        assert resolve_baf_vcf(df_both, "PAT1", vcf_dir) == "/germline/PAT1.freebayes.vcf.gz"
+        assert resolve_purecn_vcf(df_both, "PAT1", vcf_dir) == "/custom/PAT1.mutect2.vcf.gz"
 
     def test_build_cnvkit_vcf_args_cli_validation(self) -> None:
         """build_cnvkit_vcf_args uses --min-variant-depth so segment/call -m method is never clobbered."""

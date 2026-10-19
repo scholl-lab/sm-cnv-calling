@@ -25,13 +25,13 @@ properties:
     description: "Optional flag ('yes'/'no') controlling inclusion of normal BAM in cohort PoN."
   vcf:
     type: string
-    description: "Optional explicit path to somatic/germline VCF file (auto-resolved from paths.vcf_folder when omitted)."
+    description: "Optional explicit path to somatic Mutect2 VCF file (used by PureCN and as CNVkit BAF fallback when germline_vcf is omitted; overrides paths.vcf_folder)."
   vcf_stats:
     type: string
     description: "Optional explicit path to Mutect2 .vcf.gz.stats file."
   germline_vcf:
     type: string
-    description: "Optional explicit path to germline VCF file."
+    description: "Optional explicit path to germline VCF file for CNVkit BAF segmentation/calling (preferred over vcf and paths.vcf_folder for CNVkit; ignored by PureCN)."
   tumor_sample_id_vcf:
     type: string
     description: "Optional tumor sample ID(s) in the VCF header (defaults to tumor BAM basename)."

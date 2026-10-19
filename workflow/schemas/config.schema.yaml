@@ -62,7 +62,7 @@ properties:
       vcf_folder:
         type: string
         default: ""
-        description: Optional root output directory from sm-calling for automatic Mutect2 VCF/stats resolution.
+        description: Optional root output directory from sm-calling for automatic Mutect2 VCF/stats resolution (used by PureCN and as CNVkit BAF fallback when germline_vcf and vcf are omitted).
       output_folder:
         type: string
         minLength: 1

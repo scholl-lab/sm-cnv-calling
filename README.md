@@ -36,6 +36,7 @@ flowchart TD
         TCOV["cnvkit_coverage_target / antitarget\n(per unique tumor BAM)"]
         FIX["cnvkit_fix\n({unit}.cnr)"]
         SEX["cnvkit_sex + resolve_unit_sex\n({unit}.sex.txt)"]
+        GVCF["BAF VCF (germline_vcf\nor Mutect2 fallback)"]
         VCF["Mutect2 Filtered VCF\n+ .vcf.gz.stats"]
         SEG["cnvkit_segment -m cbs -t 1e-4\n(--drop-low-coverage + VCF BAF)"]
         SEGM["cnvkit_segmetrics\n(--ci --pi --sem --iqr)"]
@@ -49,7 +50,7 @@ flowchart TD
         PON --> FIX
         TCOV --> SEX
         FIX --> SEG
-        VCF --> SEG
+        GVCF --> SEG
         SEG --> SEGM
         FIX --> BINT
         SEG --> BINT
@@ -69,7 +70,7 @@ flowchart TD
         SEGM --> CALL
         CONSOL --> CALL
         SEX --> CALL
-        VCF --> CALL
+        GVCF --> CALL
         CALL --> PLOTS
         CALL --> EXPORTS
         CALL --> SUMMARY
@@ -153,12 +154,25 @@ Compatible with `sm-calling` (`workflow/schemas/samples.schema.yaml`):
 | `analysis_type` | **Yes** | `tumor_normal`, `tumor_only`, or `germline` (legacy aliases `TvsN` and `To` are also accepted). |
 | `in_pon` | No | Include normal BAM in the Panel of Normals (`yes`/`no` or `true`/`false`; defaults to included for `tumor_normal` normals). |
 | `sex` | No | Sample chromosomal sex (`female`/`male` or `F`/`M`). If omitted, inferred via `cnvkit.py sex`. |
-| `vcf` | No | Explicit somatic VCF path (overrides `paths.vcf_folder`). |
+| `vcf` | No | Explicit somatic Mutect2 VCF path (overrides `paths.vcf_folder`; used by PureCN and as CNVkit BAF fallback when `germline_vcf` is omitted). |
 | `vcf_stats` | No | Explicit Mutect2 `.vcf.gz.stats` path (overrides `paths.vcf_folder`). |
+| `germline_vcf` | No | Explicit germline VCF path for CNVkit BAF (`segment`, `call`, `scatter`). Preferred over `vcf` and `paths.vcf_folder` for CNVkit; ignored by PureCN. |
 | `tumor_sample_id_vcf` | No | Tumor sample name(s) in the VCF header (defaults to the unit's tumor BAM basename). |
 | `normal_sample_id_vcf` | No | Normal sample name in the VCF header (defaults to the unit's normal BAM basename). |
 | `purity` | No | Optional manual tumor purity override `(0, 1]` used when PureCN is disabled or fails. |
 | `ploidy` | No | Optional manual tumor ploidy override `> 0` (defaults to `2.0` when `purity` is provided). |
+
+### VCF Resolution Precedence (CNVkit vs. PureCN)
+
+CNVkit and PureCN use separate VCF resolvers (`resolve_baf_vcf()` and `resolve_purecn_vcf()`):
+
+1. **CNVkit BAF (`cnvkit_segment`, `cnvkit_call`, `cnvkit_scatter_*` via `resolve_baf_vcf()`)**:
+   - Prefers `germline_vcf` in `samples.tsv` (germline SNVs for B-allele frequency),
+   - Falls back to `vcf` in `samples.tsv`,
+   - Falls back to `{paths.vcf_folder}/mutect2/filtered/{sample}.filtered.vcf.gz`.
+2. **PureCN (`purecn_run` via `resolve_purecn_vcf()`)**:
+   - Uses **only** the Mutect2 tumor VCF: prefers `vcf` in `samples.tsv`, else `{paths.vcf_folder}/mutect2/filtered/{sample}.filtered.vcf.gz`.
+   - `germline_vcf` is never passed to PureCN (which requires somatic + germline evidence with tumor AD/AF and Mutect2 annotations). If a sample has no Mutect2 VCF, PureCN is skipped for that sample with a logged reason.
 
 ---
 
@@ -179,7 +193,7 @@ Validated against `workflow/schemas/config.schema.yaml`:
 | `ref.reptiming_bw` | `str` | `""` | Optional BigWig replication timing track for PureCN `IntervalFile.R`. |
 | `paths.samples` | `str` | `"config/samples.tsv"` | Path to sample sheet TSV. |
 | `paths.bam_folder` | `str` | `"results/exomes/bqsr"` | Directory containing analysis-ready BAM/BAI files. |
-| `paths.vcf_folder` | `str` | `"results/exomes/variant_calls"` | Root `sm-calling` output directory (auto-resolves `mutect2/filtered/{sample}.filtered.vcf.gz` and `mutect2/merged/{sample}.vcf.gz.stats`). |
+| `paths.vcf_folder` | `str` | `"results/exomes/variant_calls"` | Root `sm-calling` output directory (auto-resolves `mutect2/filtered/{sample}.filtered.vcf.gz` and `mutect2/merged/{sample}.vcf.gz.stats` for PureCN and as CNVkit BAF fallback). |
 | `paths.output_folder` | `str` | `"results/exomes/cnv_calls"` | Output root directory. |
 | `paths.log_subdir` | `str` | `"logs"` | Subdirectory under `output_folder` for rule logs and benchmarks. |
 | `bam.file_extension` | `str` | `".merged.dedup.bqsr.bam"` | Filename suffix appended to BAM basenames. |
@@ -198,7 +212,7 @@ Validated against `workflow/schemas/config.schema.yaml`:
 | `cnvkit.call_filter` | `str` | `"ci"` | Segment filter (`ci`, `cn`, `sem`, `ampdel`, `none`). |
 | `cnvkit.min_variant_depth` | `int` | `20` | Minimum VCF read depth (`-m`) for BAF calculation. |
 | `cnvkit.genes_of_interest` | `list[str]` | `["TP53", "MYC", "EGFR", "ERBB2"]` | Genes for locus zoom scatter plots (when `ref.ref_flat` is set). |
-| `purecn.enabled` | `bool` | `true` | Enable PureCN purity/ploidy estimation for units with VCFs. |
+| `purecn.enabled` | `bool` | `true` | Enable PureCN purity/ploidy estimation for units with Mutect2 VCFs. |
 | `purecn.mode` | `str` | `"cnvkit"` | `"cnvkit"` (use PoN-normalized `.cnr` + `.seg`) or `"native"` (`IntervalFile.R` + `Coverage.R` + `NormalDB.R`). |
 | `purecn.genome` | `str` | `"hg38"` | PureCN genome identifier (`hg38`, `hg19`). |
 | `purecn.assay` | `str` | `"exome"` | Assay identifier for PureCN mapping bias files. |
