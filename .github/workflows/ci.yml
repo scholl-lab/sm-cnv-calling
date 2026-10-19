@@ -36,7 +36,7 @@ jobs:
         run: shellcheck -S warning scripts/run_snakemake.sh
 
   test:
-    name: Unit, schema & dry-run tests
+    name: Unit, schema, dry-run & e2e tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -73,5 +73,5 @@ jobs:
       - name: Run full pytest suite
         shell: bash -el {0}
         run: |
-          which bedtools samtools bcftools bgzip tabix cnvkit.py snakemake
+          which bedtools samtools bcftools bgzip tabix cnvkit.py Rscript snakemake
           pytest -v

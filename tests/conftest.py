@@ -20,6 +20,7 @@ if str(REPO_ROOT) not in sys.path:
 def _augment_environment_path() -> None:
     """Ensure local conda/venv tool directories are on PATH if present."""
     candidate_dirs = [
+        Path.home() / "miniforge3" / "envs" / "sm-cnvkit" / "bin",
         Path("/tmp/sm-venv/bin"),
         Path.home() / "miniforge3" / "envs" / "varlens-annotate" / "bin",
         Path.home() / "miniforge3" / "bin",
