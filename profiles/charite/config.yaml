@@ -1,0 +1,15 @@
+# =============================================================================
+# Charite HPC cluster profile (Snakemake 8+ executor plugin)
+# =============================================================================
+# Loaded via --profile profiles/charite (auto-detected by scripts/run_snakemake.sh).
+# Requires: pip install snakemake-executor-plugin-slurm
+# =============================================================================
+
+executor: slurm
+default-resources:
+  slurm_partition: compute
+  slurm_account: sc-users
+  mem_mb: 4000
+  runtime: "120m"
+jobs: 50
+latency-wait: 60

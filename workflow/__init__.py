@@ -1,0 +1,1 @@
+"""Snakemake workflow package."""

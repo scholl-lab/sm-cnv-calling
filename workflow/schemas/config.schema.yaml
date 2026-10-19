@@ -1,0 +1,302 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+description: Configuration schema for the sm-cnv-calling somatic copy-number pipeline.
+
+type: object
+properties:
+  ref:
+    type: object
+    description: Reference genome and capture interval files.
+    properties:
+      genome:
+        type: string
+        minLength: 1
+        description: Path to reference genome FASTA file.
+      build:
+        type: string
+        enum: ["GRCh37", "GRCh38"]
+        default: "GRCh38"
+        description: Reference genome build identifier.
+      targets_bed:
+        type: string
+        minLength: 1
+        description: Path to capture target regions BED file.
+      baits_bed:
+        type: string
+        default: ""
+        description: Optional capture bait BED file (defaults to targets_bed for PureCN).
+      access_bed:
+        type: string
+        default: ""
+        description: Optional pre-computed accessible regions BED (auto-generated via cnvkit.py access when omitted).
+      blacklist_bed:
+        type: string
+        default: ""
+        description: Optional genomic blacklist BED excluded from both target and accessible regions.
+      ref_flat:
+        type: string
+        default: ""
+        description: Optional UCSC refFlat.txt gene annotation file for cnvkit target/autobin.
+      mappability_bw:
+        type: string
+        default: ""
+        description: Optional mappability BigWig track for PureCN IntervalFile.R.
+      reptiming_bw:
+        type: string
+        default: ""
+        description: Optional replication timing BigWig track for PureCN IntervalFile.R.
+    required: [genome, build, targets_bed]
+    additionalProperties: false
+
+  paths:
+    type: object
+    description: Input and output directory paths.
+    properties:
+      samples:
+        type: string
+        minLength: 1
+        description: Path to the sample sheet TSV file.
+      bam_folder:
+        type: string
+        minLength: 1
+        description: Directory containing input BAM files.
+      vcf_folder:
+        type: string
+        default: ""
+        description: Optional root output directory from sm-calling for automatic Mutect2 VCF/stats resolution.
+      output_folder:
+        type: string
+        minLength: 1
+        description: Root directory for pipeline outputs.
+      log_subdir:
+        type: string
+        default: "logs"
+        description: Subdirectory under output_folder for rule logs and benchmarks.
+    required: [samples, bam_folder, output_folder]
+    additionalProperties: false
+
+  bam:
+    type: object
+    description: BAM file naming conventions.
+    properties:
+      file_extension:
+        type: string
+        minLength: 1
+        default: ".merged.dedup.bqsr.bam"
+        description: File extension appended to BAM basenames.
+    required: [file_extension]
+    additionalProperties: false
+
+  cnvkit:
+    type: object
+    description: CNVkit copy-number calling parameters.
+    properties:
+      reference_cnn:
+        type: string
+        default: ""
+        description: Optional pre-built pooled_reference.cnn (skips PoN construction when set).
+      autobin:
+        type: boolean
+        default: false
+        description: Run cnvkit.py autobin to estimate target and antitarget bin sizes.
+      target_avg_size:
+        type: integer
+        minimum: 0
+        default: 200
+        description: Average target bin size in bp (--avg-size for cnvkit target; 0 uses tool default).
+      antitarget_avg_size:
+        type: integer
+        minimum: 0
+        default: 150000
+        description: Average antitarget bin size in bp (--avg-size for cnvkit antitarget; 0 uses tool default).
+      antitarget_min_size:
+        type: integer
+        minimum: 0
+        default: 500
+        description: Minimum antitarget bin size in bp (--min-size for cnvkit antitarget; 0 uses tool default).
+      access_min_gap_size:
+        type: integer
+        minimum: 1
+        default: 5000
+        description: Minimum gap size in bp (-s) for cnvkit.py access.
+      pon_bivar_threshold:
+        type: number
+        minimum: 0
+        default: 0.3
+        description: Maximum bivar noise metric for normal inclusion in the pooled reference.
+      male_reference:
+        type: boolean
+        default: false
+        description: Use male reference (-y / --male-reference) across CNVkit rules.
+      segment_method:
+        type: string
+        enum: ["cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-germline"]
+        default: "cbs"
+        description: Segmentation method (-m) for cnvkit.py segment.
+      segment_threshold:
+        type: number
+        exclusiveMinimum: 0
+        default: 1.0e-4
+        description: Segmentation threshold (-t) for cnvkit.py segment.
+      drop_low_coverage:
+        type: boolean
+        default: true
+        description: Pass --drop-low-coverage to cnvkit.py segment and call.
+      call_method:
+        type: string
+        enum: ["clonal", "threshold", "none"]
+        default: "clonal"
+        description: Calling method for cnvkit.py call when purity/ploidy is available.
+      call_filter:
+        type: string
+        enum: ["ci", "cn", "sem", "ampdel", "none"]
+        default: "ci"
+        description: Segment filter (--filter) for cnvkit.py call ('none' omits --filter).
+      min_variant_depth:
+        type: integer
+        minimum: 1
+        default: 20
+        description: Minimum variant read depth (-m) for VCF BAF extraction.
+      genes_of_interest:
+        type: array
+        items:
+          type: string
+        default: ["TP53", "MYC", "EGFR", "ERBB2"]
+        description: Genes for gene-level scatter plots (requires ref.ref_flat).
+    additionalProperties: false
+
+  purecn:
+    type: object
+    description: PureCN tumor purity and ploidy estimation settings.
+    properties:
+      enabled:
+        type: boolean
+        default: true
+        description: Enable PureCN purity and ploidy estimation.
+      mode:
+        type: string
+        enum: ["cnvkit", "native"]
+        default: "cnvkit"
+        description: PureCN input mode ('cnvkit' uses PoN-normalized CNR+seg; 'native' runs IntervalFile+Coverage+NormalDB).
+      genome:
+        type: string
+        enum: ["hg19", "hg38"]
+        default: "hg38"
+        description: PureCN genome identifier.
+      assay:
+        type: string
+        minLength: 1
+        default: "exome"
+        description: Assay identifier for PureCN NormalDB mapping bias files.
+      fun_segmentation:
+        type: string
+        enum: ["none", "PSCBS", "CBS", "Hclust"]
+        default: "none"
+        description: PureCN segmentation function (--fun-segmentation) in cnvkit mode.
+      normal_panel_vcf:
+        type: string
+        default: ""
+        description: Optional normal panel VCF for NormalDB.R --normal-panel mapping bias estimation.
+      normaldb:
+        type: string
+        default: ""
+        description: Optional pre-built normalDB.rds for native mode.
+      mapping_bias:
+        type: string
+        default: ""
+        description: Optional pre-built mapping_bias.rds.
+      snp_blacklist:
+        type: string
+        default: ""
+        description: Optional BED file of simple repeats / blacklisted SNPs (--snpblacklist).
+      seed:
+        type: integer
+        default: 123
+        description: Random seed for PureCN.R.
+      postoptimize:
+        type: boolean
+        default: true
+        description: Pass --postoptimize to PureCN.R.
+      extra:
+        type: string
+        default: ""
+        description: Extra passthrough CLI flags for PureCN.R.
+    additionalProperties: false
+
+  params:
+    type: object
+    description: Tool-specific passthrough CLI parameters.
+    properties:
+      cnvkit:
+        type: object
+        properties:
+          segment_method:
+            type: string
+            enum: ["cbs", "flasso", "haar", "none", "hmm", "hmm-tumor", "hmm-germline"]
+            default: "cbs"
+          segment_threshold:
+            type: number
+            exclusiveMinimum: 0
+            default: 1.0e-4
+          access_extra:
+            type: string
+            default: ""
+          target_extra:
+            type: string
+            default: ""
+          antitarget_extra:
+            type: string
+            default: ""
+          autobin_extra:
+            type: string
+            default: ""
+          coverage_extra:
+            type: string
+            default: ""
+          reference_extra:
+            type: string
+            default: ""
+          fix_extra:
+            type: string
+            default: ""
+          segment_extra:
+            type: string
+            default: ""
+          segmetrics_extra:
+            type: string
+            default: ""
+          call_extra:
+            type: string
+            default: ""
+          bintest_extra:
+            type: string
+            default: ""
+          scatter_extra:
+            type: string
+            default: ""
+          diagram_extra:
+            type: string
+            default: ""
+          heatmap_extra:
+            type: string
+            default: ""
+        additionalProperties: false
+      purecn:
+        type: object
+        properties:
+          intervalfile_extra:
+            type: string
+            default: ""
+          coverage_extra:
+            type: string
+            default: ""
+          normaldb_extra:
+            type: string
+            default: ""
+          run_extra:
+            type: string
+            default: ""
+        additionalProperties: false
+    additionalProperties: false
+
+required: [ref, paths, bam]
+additionalProperties: false
