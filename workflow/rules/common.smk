@@ -15,7 +15,8 @@ from rules.helpers import (
     get_tumor_samples as _get_tumor_samples_impl,
     get_unique_bam_basenames as _get_unique_bam_basenames_impl,
     has_matched_normal as _has_matched_normal_impl,
-    resolve_sample_vcf as _resolve_sample_vcf_impl,
+    resolve_baf_vcf as _resolve_baf_vcf_impl,
+    resolve_purecn_vcf as _resolve_purecn_vcf_impl,
     resolve_sample_vcf_stats as _resolve_sample_vcf_stats_impl,
 )
 
@@ -183,9 +184,18 @@ def get_unit_sample(unit):
     return CNV_UNITS[unit]["sample"]
 
 
-def get_unit_vcf_path(unit):
+def get_unit_baf_vcf_path(unit):
     sample = get_unit_sample(unit)
-    return _resolve_sample_vcf_impl(samples_df, sample, VCF_FOLDER)
+    return _resolve_baf_vcf_impl(samples_df, sample, VCF_FOLDER)
+
+
+def get_unit_purecn_vcf_path(unit):
+    sample = get_unit_sample(unit)
+    return _resolve_purecn_vcf_impl(samples_df, sample, VCF_FOLDER)
+
+
+def get_unit_vcf_path(unit):
+    return get_unit_baf_vcf_path(unit)
 
 
 def get_unit_vcf_stats_path(unit):
@@ -194,13 +204,13 @@ def get_unit_vcf_stats_path(unit):
 
 
 def get_unit_vcf_input(wildcards):
-    vcf = get_unit_vcf_path(wildcards.unit)
+    vcf = get_unit_baf_vcf_path(wildcards.unit)
     return [vcf] if vcf else []
 
 
 def get_unit_vcf_args(wildcards):
     meta = CNV_UNITS[wildcards.unit]
-    vcf = get_unit_vcf_path(wildcards.unit)
+    vcf = get_unit_baf_vcf_path(wildcards.unit)
     return _build_cnvkit_vcf_args_impl(
         vcf=vcf,
         tumor_id=meta["tumor_vcf_id"],
@@ -230,11 +240,14 @@ def get_cnvkit_reference(wildcards=None):
     return os.path.join(CNVKIT_REF_DIR, "pooled_reference.cnn")
 
 
+PURECN_UNITS = (
+    [u for u in get_cnv_unit_ids() if bool(get_unit_purecn_vcf_path(u))] if PURECN_ENABLED else []
+)
+
+
 def get_purecn_units():
-    """Return somatic CNV units eligible for PureCN (must have a VCF and purecn.enabled=true)."""
-    if not PURECN_ENABLED:
-        return []
-    return [u for u in get_cnv_unit_ids() if bool(get_unit_vcf_path(u))]
+    """Return somatic CNV units eligible for PureCN (must have a Mutect2 VCF and purecn.enabled=true)."""
+    return PURECN_UNITS
 
 
 def get_purecn_mapping_bias_path():

@@ -5,11 +5,14 @@ All functions are free of Snakemake imports so they can be unit-tested directly.
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_BAM_EXT = ".merged.dedup.bqsr.bam"
 
@@ -350,10 +353,10 @@ def get_cnv_unit_ids(samples_df: pd.DataFrame, bam_ext: str = DEFAULT_BAM_EXT) -
     return list(get_cnv_units(samples_df, bam_ext).keys())
 
 
-def resolve_sample_vcf(samples_df: pd.DataFrame, sample: str, vcf_folder: str = "") -> str:
-    """Resolve VCF path for a sample from samples.tsv or paths.vcf_folder."""
+def resolve_baf_vcf(samples_df: pd.DataFrame, sample: str, vcf_folder: str = "") -> str:
+    """Resolve BAF VCF path for CNVkit from samples.tsv ('germline_vcf', fallback 'vcf') or paths.vcf_folder."""
     row = samples_df.loc[samples_df["sample"] == sample].iloc[0]
-    for col in ("vcf", "germline_vcf"):
+    for col in ("germline_vcf", "vcf"):
         val = str(row.get(col, "")).strip()
         if val and val != "." and pd.notna(row.get(col)):
             return val
@@ -361,6 +364,42 @@ def resolve_sample_vcf(samples_df: pd.DataFrame, sample: str, vcf_folder: str = 
     if folder and folder != ".":
         return os.path.join(folder, "mutect2", "filtered", f"{sample}.filtered.vcf.gz")
     return ""
+
+
+def resolve_purecn_vcf(samples_df: pd.DataFrame, sample: str, vcf_folder: str = "") -> str:
+    """Resolve Mutect2 somatic VCF path for PureCN from samples.tsv ('vcf') or paths.vcf_folder.
+
+    PureCN requires a Mutect2 tumor VCF (somatic + germline variants with tumor AD/AF and
+    Mutect2 annotations); germline_vcf is intentionally ignored. If no Mutect2 VCF is
+    available, logs the reason and returns '' so PureCN is skipped for that sample.
+    """
+    row = samples_df.loc[samples_df["sample"] == sample].iloc[0]
+    val = str(row.get("vcf", "")).strip()
+    if val and val != "." and pd.notna(row.get("vcf")):
+        return val
+    folder = str(vcf_folder).strip()
+    if folder and folder != ".":
+        return os.path.join(folder, "mutect2", "filtered", f"{sample}.filtered.vcf.gz")
+    germline_val = str(row.get("germline_vcf", "")).strip()
+    if germline_val and germline_val != "." and pd.notna(row.get("germline_vcf")):
+        logger.warning(
+            "Skipping PureCN for sample '%s': germline_vcf='%s' is set but no Mutect2 VCF "
+            "('vcf' column or 'paths.vcf_folder') was provided.",
+            sample,
+            germline_val,
+        )
+    else:
+        logger.info(
+            "Skipping PureCN for sample '%s': no Mutect2 VCF ('vcf' column or 'paths.vcf_folder') "
+            "was provided.",
+            sample,
+        )
+    return ""
+
+
+def resolve_sample_vcf(samples_df: pd.DataFrame, sample: str, vcf_folder: str = "") -> str:
+    """Backward-compatible alias for resolve_baf_vcf()."""
+    return resolve_baf_vcf(samples_df, sample, vcf_folder)
 
 
 def resolve_sample_vcf_stats(samples_df: pd.DataFrame, sample: str, vcf_folder: str = "") -> str:

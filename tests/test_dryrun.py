@@ -153,6 +153,62 @@ class TestWorkflowDryRun:
         assert "rule cnvkit_scatter_gene:" in out
         assert "rule create_summary_report:" in out
 
+    def test_separate_baf_and_purecn_vcf_resolution_in_dag(
+        self, minimal_workspace: dict[str, Any]
+    ) -> None:
+        """When both germline_vcf and Mutect2 VCF are set, CNVkit uses germline_vcf and PureCN uses Mutect2 VCF (#13)."""
+        vcf_dir = minimal_workspace["vcf_dir"]
+        germline_vcf = vcf_dir / "PAT1.germline.vcf.gz"
+        germline_vcf.write_bytes(b"\x1f\x8b")
+        mutect2_vcf = vcf_dir / "mutect2" / "filtered" / "PAT1.filtered.vcf.gz"
+
+        samples_both = minimal_workspace["tmp_path"] / "samples_both_vcf.tsv"
+        pd.DataFrame(
+            [
+                {
+                    "sample": "PAT1",
+                    "tumor_bam": "T1",
+                    "normal_bam": "N1",
+                    "analysis_type": "tumor_normal",
+                    "in_pon": "yes",
+                    "sex": "female",
+                    "vcf": str(mutect2_vcf),
+                    "germline_vcf": str(germline_vcf),
+                },
+                {
+                    "sample": "PAT_TO",
+                    "tumor_bam": "TO1",
+                    "normal_bam": ".",
+                    "analysis_type": "tumor_only",
+                    "in_pon": "no",
+                    "sex": "female",
+                    "vcf": ".",
+                    "germline_vcf": str(germline_vcf),
+                },
+            ]
+        ).to_csv(samples_both, sep="\t", index=False)
+
+        cfg = copy.deepcopy(minimal_workspace["config_dict"])
+        cfg["paths"]["samples"] = str(samples_both)
+        cfg["paths"]["vcf_folder"] = ""
+        cfg_path = minimal_workspace["tmp_path"] / "config_both_vcf.yaml"
+        cfg_path.write_text(yaml.safe_dump(cfg, sort_keys=False), encoding="utf-8")
+
+        res = _run_snakemake(cfg_path, "-p")
+        assert res.returncode == 0, f"Dry-run failed:\n{res.stdout}\n{res.stderr}"
+        out = res.stdout
+
+        # CNVkit receives germline_vcf for both PAT1 and PAT_TO
+        assert f"-v {germline_vcf} -i T1 -n N1" in out
+        assert f"-v {germline_vcf} -i TO1" in out
+        assert f"-v {mutect2_vcf}" not in out
+
+        # PureCN receives Mutect2 VCF for PAT1 and is skipped for germline-only PAT_TO
+        assert f"--vcf {mutect2_vcf}" in out
+        assert f"--vcf {germline_vcf}" not in out
+        assert "PAT1/PAT1.csv" in out
+        assert "PAT_TO/PAT_TO.csv" not in out
+
     def test_auto_access_bed_and_autobin_mode(self, minimal_workspace: dict[str, Any]) -> None:
         """When ref.access_bed is empty and cnvkit.autobin is true, cnvkit_access and cnvkit_autobin run."""
         cfg = copy.deepcopy(minimal_workspace["config_dict"])
