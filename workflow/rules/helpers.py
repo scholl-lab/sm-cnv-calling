@@ -341,6 +341,7 @@ def get_cnv_units(
                 "normal_bam_raw": normal_raw if normal_bn else "",
                 "tumor_vcf_id": tumor_vcf_id,
                 "normal_vcf_id": normal_vcf_id if atype == "tumor_normal" else "",
+                "multi_region": is_multi,
                 "sex": sex,
                 "purity": purity,
                 "ploidy": ploidy,

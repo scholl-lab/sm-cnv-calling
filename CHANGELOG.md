@@ -5,6 +5,14 @@ All notable changes to `sm-cnv-calling` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-10-21
+
+### Fixed
+- **PureCN on multi-region units:** each multi-region unit (`{sample}__{bam}`) got the joint multi-sample Mutect2 VCF (e.g. two tumour regions plus the normal), and `PureCN.R` stopped with `VCF contains 3 samples. Should be either one or two`. The fault-tolerant fallback then wrote empty `.csv`/`.rds` with status `failed`, so the failure was silent. The new rule `purecn_subset_vcf` (bcftools, CNVkit env) subsets the VCF to the unit's `tumor_vcf_id` (+ `normal_vcf_id`) and PureCN uses the subset. Single-region units keep their VCF input unchanged, so existing PureCN results are not invalidated. Units carry a `multi_region` flag.
+### Changed
+- **`purecn_run` uses its threads:** it passes `--cores {threads}` to `PureCN.R` (BiocParallel MulticoreParam), so the purity/ploidy local optima are fitted in parallel. Set the thread count in the profile (`set-threads: purecn_run`); the default stays 1. Serial fitting took about 10 min per candidate on FFPE exomes.
+- **`unit` wildcard constraint (#15):** the constraint is now `(?:(?!\.segmetrics)[^/])+`, which checks only the wildcard's own characters, so `cnvkit_segment` no longer tries `unit=<id>.segmetrics`. This removes one `InputFunctionException ... KeyError` per unit from every DAG build.
+
 ## [0.1.0] - 2026-10-19
 
 ### Added

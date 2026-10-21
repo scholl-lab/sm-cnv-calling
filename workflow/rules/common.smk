@@ -136,7 +136,7 @@ CNV_UNITS = _get_cnv_units_impl(samples_df, BAM_EXT)
 
 
 wildcard_constraints:
-    unit=r"(?!.*\.segmetrics$)[^/]+",
+    unit=r"(?:(?!\.segmetrics)[^/])+",  # no char of the unit may start ".segmetrics" (#15)
     bam_basename=r"[^/]+",
 
 
@@ -192,6 +192,13 @@ def get_unit_baf_vcf_path(unit):
 def get_unit_purecn_vcf_path(unit):
     sample = get_unit_sample(unit)
     return _resolve_purecn_vcf_impl(samples_df, sample, VCF_FOLDER)
+
+
+def get_unit_purecn_vcf_input(unit):
+    """PureCN accepts one tumour (+ one normal): multi-region units get their per-unit subset of the joint VCF."""
+    if CNV_UNITS[unit]["multi_region"]:
+        return os.path.join(PURECN_RUNS_DIR, unit, f"{unit}.purecn_input.vcf.gz")
+    return get_unit_purecn_vcf_path(unit)
 
 
 def get_unit_vcf_path(unit):
