@@ -198,7 +198,9 @@ if PURECN_ENABLED:
             tbi=os.path.join(PURECN_RUNS_DIR, "{unit}", "{unit}.purecn_input.vcf.gz.tbi"),
         params:
             samples=lambda wc: ",".join(
-                s for s in (CNV_UNITS[wc.unit]["tumor_vcf_id"], CNV_UNITS[wc.unit]["normal_vcf_id"]) if s
+                s
+                for s in (CNV_UNITS[wc.unit]["tumor_vcf_id"], CNV_UNITS[wc.unit]["normal_vcf_id"])
+                if s
             ),
         conda:
             "../envs/cnvkit.yaml"

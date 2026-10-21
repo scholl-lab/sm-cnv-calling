@@ -136,7 +136,7 @@ CNV_UNITS = _get_cnv_units_impl(samples_df, BAM_EXT)
 
 
 wildcard_constraints:
-    unit=r"(?![^/]*\.segmetrics)[^/]+",
+    unit=r"(?:(?!\.segmetrics)[^/])+",  # no char of the unit may start ".segmetrics" (#15)
     bam_basename=r"[^/]+",
 
 
