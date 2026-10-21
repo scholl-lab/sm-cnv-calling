@@ -189,6 +189,27 @@ if PURECN_ENABLED:
             parts.append(f"--mappingbiasfile {input.mapping_bias[0]}")
         return " ".join(parts)
 
+    rule purecn_subset_vcf:
+        """Subset a joint multi-region Mutect2 VCF to the unit's tumour (+ normal) for PureCN."""
+        input:
+            vcf=lambda wc: get_unit_purecn_vcf_path(wc.unit),
+        output:
+            vcf=os.path.join(PURECN_RUNS_DIR, "{unit}", "{unit}.purecn_input.vcf.gz"),
+            tbi=os.path.join(PURECN_RUNS_DIR, "{unit}", "{unit}.purecn_input.vcf.gz.tbi"),
+        params:
+            samples=lambda wc: ",".join(
+                s for s in (CNV_UNITS[wc.unit]["tumor_vcf_id"], CNV_UNITS[wc.unit]["normal_vcf_id"]) if s
+            ),
+        conda:
+            "../envs/cnvkit.yaml"
+        log:
+            os.path.join(LOG_DIR, "purecn_subset_vcf/{unit}.log"),
+        shell:
+            r"""
+            bcftools view -s {params.samples} -Oz -o {output.vcf} {input.vcf} 2> {log}
+            bcftools index -t {output.vcf} 2>> {log}
+            """
+
     rule purecn_run:
         """Run fault-tolerant PureCN purity and ploidy estimation for a tumor unit."""
         input:
@@ -197,7 +218,7 @@ if PURECN_ENABLED:
             intervals=_purecn_run_intervals_input,
             normaldb=_purecn_run_normaldb_input,
             mapping_bias=_purecn_run_mapping_bias_input,
-            vcf=lambda wc: get_unit_purecn_vcf_path(wc.unit),
+            vcf=lambda wc: get_unit_purecn_vcf_input(wc.unit),
             stats=_purecn_run_stats_input,
             snp_blacklist=[PURECN_SNP_BLACKLIST] if PURECN_SNP_BLACKLIST else [],
         output:

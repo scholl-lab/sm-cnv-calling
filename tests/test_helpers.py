@@ -136,9 +136,11 @@ class TestSampleSheetAndBamResolution:
         assert u_mr["normal_bam"] == "MR_N_01"
         assert u_mr["tumor_vcf_id"] == "MR_T_01A"
         assert u_mr["normal_vcf_id"] == "MR_N_01"
+        assert u_mr["multi_region"] is True  # PureCN gets a per-unit subset of the joint VCF
 
         # Single-region unit keeps sample name as unit ID
         u_sr = units["SR_PAT_01"]
+        assert u_sr["multi_region"] is False
         assert u_sr["tumor_bam"] == "SR_T_01"
         assert u_sr["normal_bam"] == "SR_N_01"
 
