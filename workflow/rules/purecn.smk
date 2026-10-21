@@ -237,6 +237,9 @@ if PURECN_ENABLED:
             seed=PURECN_SEED,
             postoptimize_arg="--postoptimize" if PURECN_POSTOPTIMIZE else "",
             extra=PURECN_EXTRA,
+            # BiocParallel MulticoreParam: fit the purity/ploidy local optima in parallel
+            cores_arg=lambda wc, threads: f"--cores {threads}" if threads > 1 else "",
+        threads: 1
         retries: 2
         resources:
             mem_mb=lambda wc, attempt: 16000 * attempt,
@@ -261,6 +264,7 @@ if PURECN_ENABLED:
                 --force \
                 --seed {params.seed} \
                 {params.postoptimize_arg} \
+                {params.cores_arg} \
                 {params.snp_blacklist_arg} \
                 {params.extra} \
                 > {log} 2>&1; then
