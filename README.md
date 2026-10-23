@@ -25,8 +25,8 @@ flowchart TD
         NBAM["Normal BAMs\n(in_pon=yes)"]
         TBAM["Tumor BAMs\n(single & multi-region)"]
         NCOV["cnvkit_coverage_target / antitarget\n(.targetcoverage.cnn + .antitargetcoverage.cnn)"]
-        NQC["cnvkit_metrics_normals + identify_clean_normals\n(filter bivar <= pon_bivar_threshold)"]
-        PON["cnvkit_reference_pooled\n(cohort PoN or flat reference fallback)"]
+        NQC["cnvkit_reference_prelim + cnvkit_fix_normal\n+ cnvkit_metrics_normals + identify_clean_normals\n(filter bivar <= pon_bivar_threshold)"]
+        PON["cnvkit_reference_pooled\n(clean-normal PoN; flat only without normals)"]
         BINS --> NCOV
         NBAM --> NCOV --> NQC --> PON
         FASTA --> PON
@@ -90,7 +90,7 @@ Part of the [scholl-lab](https://github.com/scholl-lab) bioinformatics suite —
 - **Accessible Genome & Blacklist Subtraction**: Automatically computes `cnvkit.py access` when `ref.access_bed` is omitted, and subtracts `ref.blacklist_bed` from both target and access intervals via `bedtools subtract`.
 - **Target Bin Splitting & Gene Annotation**: Always runs `cnvkit.py target --split --short-names` (with optional `--annotate refFlat.txt` and `cnvkit.autobin` mode) to prevent unsplit overlapping capture baits and `UNNAMED` bins.
 - **Modular Per-BAM Coverage & Allele-Aware CBS**: Deduplicates BAM coverage across multi-region samples, runs BAF-aware CBS segmentation (`-m cbs -t 1e-4 --drop-low-coverage -v {vcf} -i {tumor_id} -n {normal_id}`), computes bootstrap confidence intervals (`cnvkit.py segmetrics --ci --pi --sem --iqr`), and calls focal bin-level CNVs (`cnvkit.py bintest`).
-- **QC-Filtered Panel of Normals (PoN)**: Evaluates normal sample noise (`bivar <= pon_bivar_threshold`), passes both `.targetcoverage.cnn` and `.antitargetcoverage.cnn` to `cnvkit.py reference`, and automatically falls back to a flat reference when a cohort has 0 clean normals (or uses a pre-built `cnvkit.reference_cnn`).
+- **QC-Filtered Panel of Normals (PoN)**: Normalises every normal against a preliminary all-normals reference (`cnvkit_reference_prelim` + `cnvkit_fix_normal`, self-included, so it ranks outliers rather than measuring absolute noise), evaluates `cnvkit.py metrics` on those `.cnr` files (`bivar <= pon_bivar_threshold`), and passes both `.targetcoverage.cnn` and `.antitargetcoverage.cnn` of the clean normals to `cnvkit.py reference`. A flat reference is built only when the cohort has no normal BAMs; if normals exist but none passes the filter the run fails with an error (raise the threshold or set `cnvkit.reference_cnn`). A pre-built `cnvkit.reference_cnn` bypasses all of this.
 - **End-to-End PureCN Integration**: Supports both CNVkit-integrated mode (`purecn.mode: "cnvkit"`, feeding PoN-normalized `.cnr` and `.seg` into `PureCN.R`) and native PureCN NormalDB mode (`purecn.mode: "native"` via `IntervalFile.R --offtarget`, `Coverage.R`, and `NormalDB.R --coveragefiles`) for `tumor_normal` and `tumor_only` samples.
 - **Propagated Purity, Ploidy & Sex**: Consolidates PureCN purity and ploidy estimates into `cnvkit.py call -m clonal --filter ci --purity P --ploidy PL` (falling back safely to `-m threshold` when purity is unestimated — never fabricating purity), and propagates chromosomal sex (`-y` / `-x`) across reference, calling, diagrams, and BED/VCF exports.
 
@@ -203,7 +203,7 @@ Validated against `workflow/schemas/config.schema.yaml`:
 | `cnvkit.antitarget_avg_size` | `int` | `150000` | Antitarget bin size (`--avg-size`) for `cnvkit.py antitarget`. |
 | `cnvkit.antitarget_min_size` | `int` | `500` | Minimum antitarget bin size (`--min-size`). |
 | `cnvkit.access_min_gap_size` | `int` | `5000` | Minimum gap size (`-s`) for `cnvkit.py access`. |
-| `cnvkit.pon_bivar_threshold` | `float` | `0.3` | Maximum `bivar` metric for a normal sample to be included in the PoN. |
+| `cnvkit.pon_bivar_threshold` | `float` | `0.3` | Maximum `bivar` metric (of the normal normalised against the preliminary all-normals reference) for inclusion in the PoN; the run fails if no normal passes. |
 | `cnvkit.male_reference` | `bool` | `false` | Pass `-y` (`--male-reference`) to CNVkit reference, calling, diagrams, and exports. |
 | `cnvkit.segment_method` | `str` | `"cbs"` | Segmentation algorithm (`cbs`, `flasso`, `haar`, `none`, `hmm`, `hmm-tumor`, `hmm-germline`). |
 | `cnvkit.segment_threshold` | `float` | `1.0e-4` | Segmentation threshold (`-t`). |
@@ -234,7 +234,7 @@ results/exomes/cnv_calls/
 ├── cnvkit/
 │   ├── reference/          # access.bed, targets.clean.bed, targets.bed, antitargets.bed, pooled_reference.cnn
 │   ├── coverage/           # {bam_basename}.targetcoverage.cnn, .antitargetcoverage.cnn, .sex.tsv
-│   ├── pon_qc/             # all_normals.metrics.txt, clean_normals.list
+│   ├── pon_qc/             # prelim_reference.cnn, <normal>.cnr, all_normals.metrics.txt, clean_normals.list
 │   ├── runs/               # {unit}.cnr, {unit}.cns, {unit}.segmetrics.cns
 │   ├── calls/              # {unit}.call.cns, {unit}.bintest.cns, {unit}.sex.txt
 │   ├── exports/            # {unit}.seg, {unit}.cnv.bed, {unit}.cnv.vcf.gz(.tbi)

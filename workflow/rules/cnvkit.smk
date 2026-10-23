@@ -316,8 +316,8 @@ PY
         """
 
 
-rule cnvkit_metrics_normals:
-    """Compute noise metrics across candidate PoN normal target coverages."""
+rule cnvkit_reference_prelim:
+    """Preliminary reference from ALL normals, used only to normalise them for noise QC."""
     input:
         target_coverages=lambda wc: expand(
             os.path.join(CNVKIT_COV_DIR, "{bn}.targetcoverage.cnn"),
@@ -325,6 +325,64 @@ rule cnvkit_metrics_normals:
         ),
         antitarget_coverages=lambda wc: expand(
             os.path.join(CNVKIT_COV_DIR, "{bn}.antitargetcoverage.cnn"),
+            bn=get_normal_bams(),
+        ),
+        fasta=REF,
+    output:
+        prelim_ref=os.path.join(CNVKIT_PON_QC_DIR, "prelim_reference.cnn"),
+    params:
+        male_ref_arg="-y" if CNVKIT_MALE_REFERENCE else "",
+        extra=CNVKIT_REFERENCE_EXTRA,
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 8000 * attempt,
+        runtime=lambda wc, attempt: min(240 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_reference_prelim/reference.log"),
+    shell:
+        r"""
+        cnvkit.py reference {input.target_coverages} {input.antitarget_coverages} \
+            -f {input.fasta} \
+            {params.male_ref_arg} \
+            {params.extra} \
+            -o {output.prelim_ref} &> {log}
+        """
+
+
+rule cnvkit_fix_normal:
+    """Normalise one normal against the preliminary reference (self-included: ranks outliers, not absolute noise)."""
+    input:
+        target=os.path.join(CNVKIT_COV_DIR, "{bn}.targetcoverage.cnn"),
+        antitarget=os.path.join(CNVKIT_COV_DIR, "{bn}.antitargetcoverage.cnn"),
+        reference=os.path.join(CNVKIT_PON_QC_DIR, "prelim_reference.cnn"),
+    output:
+        cnr=os.path.join(CNVKIT_PON_QC_DIR, "{bn}.cnr"),
+    params:
+        extra=CNVKIT_FIX_EXTRA,
+    retries: 2
+    resources:
+        mem_mb=lambda wc, attempt: 4000 * attempt,
+        runtime=lambda wc, attempt: min(120 * attempt, 480),
+    conda:
+        "../envs/cnvkit.yaml"
+    log:
+        os.path.join(LOG_DIR, "cnvkit_fix_normal/{bn}.log"),
+    shell:
+        r"""
+        cnvkit.py fix {input.target} {input.antitarget} {input.reference} \
+            -i {wildcards.bn} \
+            {params.extra} \
+            -o {output.cnr} &> {log}
+        """
+
+
+rule cnvkit_metrics_normals:
+    """Compute noise metrics on reference-normalised normal .cnr files."""
+    input:
+        cnrs=lambda wc: expand(
+            os.path.join(CNVKIT_PON_QC_DIR, "{bn}.cnr"),
             bn=get_normal_bams(),
         ),
     output:
@@ -339,8 +397,8 @@ rule cnvkit_metrics_normals:
         os.path.join(LOG_DIR, "cnvkit_metrics_normals/metrics.log"),
     shell:
         r"""
-        if [ -n "{input.target_coverages}" ]; then
-            cnvkit.py metrics {input.target_coverages} -o {output.metrics_file} &> {log}
+        if [ -n "{input.cnrs}" ]; then
+            cnvkit.py metrics {input.cnrs} -o {output.metrics_file} &> {log}
         else
             printf "sample\tsegments\tstdev\tmad\tiqr\tbivar\n" > {output.metrics_file}
             echo "No normal BAMs in cohort; wrote empty normal metrics header." > {log}
@@ -381,7 +439,7 @@ PY
 
 
 rule cnvkit_reference_pooled:
-    """Build pooled normal reference from clean normals or fallback to flat reference."""
+    """Build pooled normal reference from clean normals (flat reference only without normals)."""
     input:
         normal_list=lambda wc: (
             [os.path.join(CNVKIT_PON_QC_DIR, "clean_normals.list")] if get_normal_bams() else []
@@ -414,15 +472,21 @@ rule cnvkit_reference_pooled:
         os.path.join(LOG_DIR, "benchmarks/cnvkit_reference_pooled/reference.tsv")
     shell:
         r"""
-        if [ -n "{input.normal_list}" ] && [ -s "{input.normal_list}" ]; then
+        if [ -n "{input.target_coverages}" ]; then
+            # Normals exist: a flat reference would silently degrade every sample, so fail instead.
+            if [ ! -s "{input.normal_list}" ]; then
+                echo "ERROR: no normal passed the PoN noise filter (bivar <= cnvkit.pon_bivar_threshold); refusing to build a flat reference. Inspect pon_qc/all_normals.metrics.txt and raise the threshold or supply cnvkit.reference_cnn." | tee {log} >&2
+                exit 1
+            fi
+            echo "$(( $(wc -l < {input.normal_list}) / 2 )) of $(echo {input.target_coverages} | wc -w) normals passed the PoN noise filter." > {log}
             CLEAN_FILES=$(tr '\n' ' ' < {input.normal_list})
             cnvkit.py reference $CLEAN_FILES \
                 -f {input.fasta} \
                 {params.male_ref_arg} \
                 {params.extra} \
-                -o {output.pooled_ref} &> {log}
+                -o {output.pooled_ref} &>> {log}
         else
-            echo "WARNING: No clean normals available; building flat reference." > {log}
+            echo "No normal BAMs in cohort; building flat reference." > {log}
             cnvkit.py reference \
                 -f {input.fasta} \
                 -t {input.targets} \

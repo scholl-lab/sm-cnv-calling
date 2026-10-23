@@ -491,7 +491,7 @@ def identify_clean_normals(
     seen_basenames: set[str] = set()
     for raw_sample in clean_df["sample"].astype(str).tolist():
         bn = os.path.basename(raw_sample.strip())
-        for suffix in (".targetcoverage.cnn", ".antitargetcoverage.cnn", ".cnn"):
+        for suffix in (".targetcoverage.cnn", ".antitargetcoverage.cnn", ".cnn", ".cnr"):
             if bn.endswith(suffix):
                 bn = bn[: -len(suffix)]
                 break

@@ -380,7 +380,7 @@ class TestNormalPoNFiltering:
         """identify_clean_normals strips suffixes and outputs verified target+antitarget .cnn paths."""
         cov_dir = tmp_path / "coverage"
         cov_dir.mkdir()
-        for bn in ("N1", "N2", "N3"):
+        for bn in ("N1", "N2", "N3", "N4"):
             (cov_dir / f"{bn}.targetcoverage.cnn").write_text("cov\n", encoding="utf-8")
             (cov_dir / f"{bn}.antitargetcoverage.cnn").write_text("cov\n", encoding="utf-8")
 
@@ -390,6 +390,7 @@ class TestNormalPoNFiltering:
                 {"sample": str(cov_dir / "N1.targetcoverage.cnn"), "bivar": 0.12, "mad": 0.1},
                 {"sample": "N2.cnn", "bivar": 0.45, "mad": 0.4},  # noisy -> excluded
                 {"sample": "N3", "bivar": 0.25, "mad": 0.2},
+                {"sample": "pon_qc/N4.cnr", "bivar": 0.2, "mad": 0.2},  # reference-normalised .cnr
             ]
         ).to_csv(metrics_tsv, sep="\t", index=False)
 
@@ -401,6 +402,8 @@ class TestNormalPoNFiltering:
             str(cov_dir / "N1.antitargetcoverage.cnn"),
             str(cov_dir / "N3.targetcoverage.cnn"),
             str(cov_dir / "N3.antitargetcoverage.cnn"),
+            str(cov_dir / "N4.targetcoverage.cnn"),
+            str(cov_dir / "N4.antitargetcoverage.cnn"),
         ]
         assert out_list.read_text(encoding="utf-8").splitlines() == paths
 
