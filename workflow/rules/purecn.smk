@@ -256,7 +256,20 @@ if PURECN_ENABLED:
             r"""
             mkdir -p {params.outdir}
             PURECN=$(Rscript -e 'cat(system.file("extdata", package = "PureCN"))')
-            if Rscript "$PURECN/PureCN.R" \
+            SCRIPT="$PURECN/PureCN.R"
+            if [ {threads} -gt 1 ]; then
+                # PureCN.R uses MulticoreParam(tasks = 0), which pre-splits the optima into
+                # one fixed chunk per worker; tasks = 1000L (capped at length(X) by
+                # BiocParallel) makes every optimum its own task so idle workers pick up work.
+                SCRIPT="{params.outdir}/PureCN.patched.R"
+                if ! grep -qF 'MulticoreParam(workers = opt$cores)' "$PURECN/PureCN.R"; then
+                    echo "ERROR: MulticoreParam(workers = opt\$cores) not found in $PURECN/PureCN.R; update the patch" > {log}
+                    exit 1
+                fi
+                sed 's/MulticoreParam(workers = opt\$cores)/MulticoreParam(workers = opt$cores, tasks = 1000L)/' \
+                    "$PURECN/PureCN.R" > "$SCRIPT"
+            fi
+            if Rscript "$SCRIPT" \
                 --out {params.outdir}/{wildcards.unit} \
                 --sampleid {params.sampleid} \
                 {params.mode_args} \

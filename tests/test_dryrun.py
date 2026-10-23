@@ -153,6 +153,16 @@ class TestWorkflowDryRun:
         assert "rule cnvkit_scatter_gene:" in out
         assert "rule create_summary_report:" in out
 
+    def test_purecn_run_patches_per_optimum_tasks_only_when_threaded(
+        self, minimal_workspace: dict[str, Any]
+    ) -> None:
+        """threads > 1 runs a PureCN.R copy patched to one BiocParallel task per optimum."""
+        cfg = minimal_workspace["config_path"]
+        res = _run_snakemake(cfg, "-p", "--set-threads", "purecn_run=4", "--cores", "4")
+        assert res.returncode == 0, f"Dry-run failed:\n{res.stderr}"
+        assert "tasks = 1000L" in res.stdout and "--cores 4" in res.stdout
+        assert "PureCN.patched.R" in res.stdout and "exit 1" in res.stdout
+
     def test_separate_baf_and_purecn_vcf_resolution_in_dag(
         self, minimal_workspace: dict[str, Any]
     ) -> None:
