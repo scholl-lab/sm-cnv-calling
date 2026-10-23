@@ -359,6 +359,8 @@ def test_end_to_end_cnvkit_workflow(tmp_path: Path) -> None:
         summary_tsv,
         normal_qc_tsv,
         clean_normals,
+        out_dir / "cnvkit" / "pon_qc" / "prelim_reference.cnn",
+        out_dir / "cnvkit" / "pon_qc" / "N1.cnr",
         out_dir / "cnvkit" / "reference" / "pooled_reference.cnn",
         out_dir / "cnvkit" / "plots" / "scatter_genome" / "PAT1.genome.pdf",
         out_dir / "cnvkit" / "plots" / "diagram" / "PAT1.diagram.pdf",
@@ -414,7 +416,7 @@ def test_end_to_end_cnvkit_workflow(tmp_path: Path) -> None:
     bed_text = bed_export.read_text(encoding="utf-8")
     assert "chr1\t" in bed_text and "chr2\t" in bed_text
 
-    # 9. Verify the flat-reference fallback path works when no clean normals are available
+    # 9. Normals exist but none passes the PoN filter: fail loudly, never fall back to a flat reference
     flat_out_dir = tmp_path / "results_flat"
     flat_cfg = copy.deepcopy(config_dict)
     flat_cfg["paths"]["output_folder"] = str(flat_out_dir)
@@ -447,18 +449,9 @@ def test_end_to_end_cnvkit_workflow(tmp_path: Path) -> None:
         text=True,
         timeout=180,
     )
-    assert flat_res.returncode == 0, (
-        f"Flat-reference fallback run failed:\n{flat_res.stdout}\n{flat_res.stderr}"
-    )
-
-    flat_clean = flat_out_dir / "cnvkit" / "pon_qc" / "clean_normals.list"
-    assert flat_clean.is_file() and flat_clean.read_text(encoding="utf-8") == ""
+    assert flat_res.returncode != 0, "Run must fail when no normal passes the PoN filter"
     flat_ref_log = (flat_out_dir / "logs" / "cnvkit_reference_pooled" / "reference.log").read_text(
         encoding="utf-8"
     )
-    assert "WARNING: No clean normals available; building flat reference." in flat_ref_log
-    assert (flat_out_dir / "cnvkit" / "reference" / "pooled_reference.cnn").is_file()
-    _assert_gain_and_loss_calls(
-        flat_call_cns,
-        flat_out_dir / "cnvkit" / "runs" / "PAT1.cnr",
-    )
+    assert "no normal passed the PoN noise filter" in flat_ref_log
+    assert not (flat_out_dir / "cnvkit" / "reference" / "pooled_reference.cnn").exists()

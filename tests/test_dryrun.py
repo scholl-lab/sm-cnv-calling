@@ -66,6 +66,8 @@ class TestWorkflowDryRun:
             "cnvkit_coverage_antitarget",
             "cnvkit_sex",
             "resolve_unit_sex",
+            "cnvkit_reference_prelim",
+            "cnvkit_fix_normal",
             "cnvkit_metrics_normals",
             "identify_clean_normals",
             "cnvkit_reference_pooled",
@@ -129,6 +131,8 @@ class TestWorkflowDryRun:
         assert "-i T2_R2 -n N2" in out
 
         # #6: Normal QC metrics -> identify_clean_normals -> cnvkit_reference_pooled
+        assert "rule cnvkit_reference_prelim:" in out
+        assert "rule cnvkit_fix_normal:" in out
         assert "rule cnvkit_metrics_normals:" in out
         assert "rule identify_clean_normals:" in out
         assert "rule cnvkit_reference_pooled:" in out
@@ -261,6 +265,8 @@ class TestWorkflowDryRun:
         assert res.returncode == 0, f"0-normal dry-run failed:\n{res.stdout}\n{res.stderr}"
         assert "rule cnvkit_reference_pooled:" in res.stdout
         assert "rule cnvkit_metrics_normals:" not in res.stdout
+        assert "rule cnvkit_reference_prelim:" not in res.stdout
+        assert "rule cnvkit_fix_normal:" not in res.stdout
         assert "rule identify_clean_normals:" not in res.stdout
 
     def test_prebuilt_reference_cnn_bypasses_pon_rules(
@@ -288,6 +294,7 @@ class TestWorkflowDryRun:
         assert "rule cnvkit_target:" not in res.stdout
         assert "rule cnvkit_antitarget:" not in res.stdout
         assert "rule cnvkit_reference_pooled:" not in res.stdout
+        assert "rule cnvkit_reference_prelim:" not in res.stdout
         assert "rule cnvkit_metrics_normals:" not in res.stdout
         assert str(prebuilt) in res.stdout
 
@@ -435,6 +442,8 @@ class TestWorkflowDryRun:
                 encoding="utf-8",
             )
 
+        for bn in ("N1", "N2", "G1"):  # metrics now depend on per-normal .cnr files
+            (pon_qc_dir / f"{bn}.cnr").write_text("cnr\n", encoding="utf-8")
         (pon_qc_dir / "all_normals.metrics.txt").write_text(
             "sample\tsegments\tstdev\tmad\tiqr\tbivar\n"
             "N1.targetcoverage.cnn\t10\t0.10\t0.08\t0.09\t0.11\n"

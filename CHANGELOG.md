@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **PoN noise QC used raw coverage, so no normal ever passed (flat reference):** `cnvkit_metrics_normals` ran `cnvkit.py metrics` on raw `*.targetcoverage.cnn` files, whose spread is large for every normal (apa-sequencing run v3: bivar 0.46-0.55 for all 20 normals vs. `pon_bivar_threshold` 0.3). `identify_clean_normals` selected 0 normals and `cnvkit_reference_pooled` silently built a flat reference, giving noisy segmentation, impossible chrX copy numbers and poor PureCN fits. **All earlier runs that had normals used a flat reference; re-run `cnvkit_reference_pooled` and everything downstream.** New rules `cnvkit_reference_prelim` (reference from all normals, `pon_qc/prelim_reference.cnn`) and `cnvkit_fix_normal` (`pon_qc/{normal}.cnr`) normalise each normal first (self-included, so it ranks outliers rather than measuring absolute noise); `cnvkit_metrics_normals` now runs on those `.cnr` files and `identify_clean_normals` also strips `.cnr`.
+### Changed
+- `cnvkit_reference_pooled` builds a flat reference only when the cohort has no normal BAMs. If normals exist but none passes `pon_bivar_threshold`, it now fails with an error instead of silently falling back; the log states how many normals passed.
+
 ## [0.1.3] - 2026-10-23
 
 ### Fixed
