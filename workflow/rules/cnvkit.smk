@@ -488,7 +488,7 @@ rule cnvkit_segment:
         mem_mb=lambda wc, attempt: 8000 * attempt,
         runtime=lambda wc, attempt: min(240 * attempt, 480),
     conda:
-        "../envs/cnvkit.yaml"
+        "../envs/cnvkit_segment.yaml"
     log:
         os.path.join(LOG_DIR, "cnvkit_segment/{unit}.log"),
     benchmark:
