@@ -5,6 +5,11 @@ All notable changes to `sm-cnv-calling` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`purecn_run` load balancing:** with `--cores N`, `PureCN.R` builds `MulticoreParam(workers = N)` with BiocParallel's default `tasks = 0`, which pre-splits the ~17 purity/ploidy local optima into N fixed chunks; one worker ran alone for over 19 h while the others idled (seen in apa-sequencing run v3, APA55). When `threads > 1` the rule now runs a copy of `PureCN.R` patched to `tasks = 1000L` (capped at the number of optima), so each optimum is its own task. The rule fails loudly if the expected line is not found in the installed PureCN.
+
 ## [0.1.2] - 2026-10-21
 
 ### Fixed
